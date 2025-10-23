@@ -69,8 +69,8 @@
     <!-- Firebase SDK Imports -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, addDoc, onSnapshot, collection, query, serverTimestamp, orderBy, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, addDoc, onSnapshot, collection, query, serverTimestamp, orderBy, setLogLevel, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- GLOBAL STATE & FIREBASE SETUP ---
         let db;
@@ -107,48 +107,42 @@
 
         async function initFirebase() {
             setLogLevel('debug'); // Enable Firestore logging
+            let firebaseConfig;
+            
+            // NOTE: Using a static App ID for external hosting consistency.
+            const currentAppId = 'image-bin-github-app';
 
             try {
-                // --- MANDATORY: Access and parse global config variables ---
-                const configString = typeof __firebase_config !== 'undefined' ? __firebase_config : '';
-                let firebaseConfig;
-
-                // Check for valid config string before parsing
-                if (!configString.trim()) {
-                    throw new Error("The environment did not provide a valid Firebase configuration string.");
-                }
-
-                try {
-                    firebaseConfig = JSON.parse(configString);
-                } catch (e) {
-                    console.error("Failed to parse Firebase Config:", e);
-                    throw new Error("Invalid Firebase configuration format. Cannot initialize application.");
-                }
+                // -----------------------------------------------------------------------------------
+                // --- CRITICAL STEP FOR GITHUB/EXTERNAL HOSTING: CONFIGURATION SUPPLIED ---
+                // This configuration connects the app to your Firebase Project: image-uploader-46f04
+                // -----------------------------------------------------------------------------------
+                firebaseConfig = {
+                    apiKey: "AIzaSyBJELImxh2a5nx85UCHIxHgiD-H-v8LsxE",           
+                    authDomain: "image-uploader-46f04.firebaseapp.com",  
+                    projectId: "image-uploader-46f04",    
+                    storageBucket: "image-uploader-46f04.firebasestorage.app",
+                    messagingSenderId: "1046392282951",
+                    appId: "1:1046392282951:web:ca8e9e14d6281f03bef662",
+                    measurementId: "G-WX74X0NEGK"
+                };
                 
-                appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
-                if (Object.keys(firebaseConfig).length === 0) {
-                    throw new Error("Firebase configuration object is empty.");
-                }
-                // --- END MANDATORY CONFIG PARSING ---
-
+                appId = currentAppId;
+                
                 // Initialize Firebase App and Services
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
 
-                // Set persistence to session to maintain state across reloads in the sandbox
-                await setPersistence(auth, browserSessionPersistence);
+                // Setting persistence to Local Storage to maintain user session permanently.
+                await setPersistence(auth, browserLocalPersistence);
 
-                // MANDATORY: Sign-in logic
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
+                // Sign in anonymously for a permanent, simple user ID.
+                await signInAnonymously(auth);
 
                 // Get current user ID and update UI
-                userId = auth.currentUser?.uid || 'anonymous';
+                // Using crypto.randomUUID() as a final fallback if auth fails for some reason
+                userId = auth.currentUser?.uid || crypto.randomUUID(); 
                 document.getElementById('user-info').innerHTML = `Logged in as: <span class="font-mono text-xs bg-gray-100 p-1 rounded">${userId}</span> (App ID: ${appId})`;
                 uploadBtn.disabled = false;
                 showStatus('Firebase initialized and user authenticated!', false);
@@ -161,7 +155,7 @@
                 document.getElementById('user-info').textContent = `Authentication Failed! Cannot start app.`;
                 uploadBtn.disabled = true;
                 // Show a detailed error message on the screen
-                showStatus(`Initialization Error: ${error.message} (Check console for details)`, true);
+                showStatus(`Initialization Error: ${error.message}`, true);
             }
         }
 
@@ -217,6 +211,29 @@
                 uploadBtn.textContent = 'Save Image';
             }
         }
+        
+        // New function to handle image deletion
+        async function deleteImage(imageId, imageName, uploaderId) {
+            if (uploaderId !== userId) {
+                // This is a minimal check; Firestore security rules should handle the final authorization
+                showStatus(`You can only delete images you uploaded!`, true);
+                return;
+            }
+            
+            // Use a custom modal or window.confirm() as a substitute for alert/confirm since we're in an isolated environment.
+            const confirmed = window.confirm(`Are you sure you want to delete "${imageName}"?`);
+            if (!confirmed) return;
+
+
+            try {
+                const imageDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'images', imageId);
+                await deleteDoc(imageDocRef);
+                showStatus(`Image "${imageName}" deleted successfully!`);
+            } catch (e) {
+                console.error("Error deleting document: ", e);
+                showStatus(`Failed to delete image: ${e.message}`, true);
+            }
+        }
 
         function renderImages(images) {
             imageList.innerHTML = ''; // Clear current list
@@ -230,7 +247,7 @@
 
             images.forEach(image => {
                 const imageCard = document.createElement('div');
-                imageCard.className = 'bg-white border border-gray-200 rounded-xl shadow-md overflow-hidden transition-all hover:shadow-lg flex flex-col';
+                imageCard.className = 'bg-white border border-gray-200 rounded-xl shadow-md overflow-hidden transition-all hover:shadow-lg flex flex-col relative';
 
                 // Image Container
                 const imgContainer = document.createElement('div');
@@ -273,8 +290,19 @@
                 }
                 date.className = 'text-xs text-gray-500 mt-1';
                 content.appendChild(date);
-
+                
                 imageCard.appendChild(content);
+
+                // Delete Button (only visible if uploaded by current user)
+                if (image.uploadedBy === userId) {
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.innerHTML = '🗑️'; // Trash icon
+                    deleteBtn.className = 'absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full text-sm hover:bg-red-600 transition duration-150 shadow-md';
+                    deleteBtn.title = 'Delete this image';
+                    deleteBtn.onclick = () => deleteImage(image.id, image.name, image.uploadedBy);
+                    imageCard.appendChild(deleteBtn);
+                }
+
                 imageList.appendChild(imageCard);
             });
         }
@@ -291,7 +319,6 @@
                 renderImages(images);
             }, (error) => {
                 console.error("Error listening to Firestore:", error);
-                // Note: The 400 errors from previous attempts were likely due to the Auth config issue.
                 showStatus(`Real-time error: Could not fetch shared data. ${error.message}`, true);
             });
         }
