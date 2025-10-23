@@ -208,7 +208,7 @@
         const loginView = document.getElementById('login-view');
         const uploaderView = document.getElementById('uploader-view');
         const loginForm = document.getElementById('login-form');
-        // New Single Input Element
+        // Single Input Element
         const loginSingleCodeInput = document.getElementById('login-single-code'); 
         
         const loginBtn = document.getElementById('login-btn');
@@ -282,7 +282,7 @@
                 // setLogLevel('Debug'); // Uncomment for debugging
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
-                showMessage('info', 'System ready. Enter tokens to log in.', 'login');
+                showMessage('info', 'System ready. Enter codes to log in.', 'login');
 
                 // Ensure initial view state is correct
                 userId = null;
@@ -427,7 +427,8 @@
                 showMessage('success', 'Access granted! Loading upload history.', 'login');
                 
                 // Grant access and load data
-                toggleView(true);
+                toggleView(true); // TRANSITIONS TO UPLOADER VIEW
+                loginForm.reset(); // Clears input field for cleanup
                 loadImagesFromFirestore();
                 loginBtn.textContent = 'Access Granted';
             } else {
