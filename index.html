@@ -3,12 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Standalone Image Uploader Bin</title>
+    <title>Standalone Image Uploader Bin (Fixed)</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Combined Firebase Imports for Firestore -->
+    <!-- Combined Firebase Imports (Auth and Firestore) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, signInAnonymously 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { 
             getFirestore, collection, addDoc, onSnapshot, 
             query, serverTimestamp, setLogLevel
@@ -16,7 +19,8 @@
 
         // Expose combined Firebase objects globally
         window.firebase = {
-            initializeApp, getFirestore, collection, addDoc, onSnapshot, 
+            initializeApp, getAuth, signInAnonymously, 
+            getFirestore, collection, addDoc, onSnapshot, 
             query, serverTimestamp, setLogLevel
         };
     </script>
@@ -64,6 +68,16 @@
             transform: translateY(-2px);
             box-shadow: 0 6px 15px -3px rgba(79, 70, 229, 0.6);
         }
+        .btn-secondary {
+            background-color: #374151; /* Slate-700 */
+            color: #d1d5db; /* Gray-300 */
+        }
+        .btn-secondary:hover {
+            background-color: #4b5563; /* Slate-600 */
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px -3px rgba(0, 0, 0, 0.3);
+        }
+
         /* Custom scrollbar for the table container */
         #uploaded-images-list::-webkit-scrollbar {
             height: 6px;
@@ -83,8 +97,8 @@
             <h1 class="text-3xl font-bold text-gray-100">Image Uploader Bin <span class="text-indigo-400">2.0</span></h1>
         </div>
         <p class="text-gray-400 mb-8">
-            Upload images here. Data is saved locally in a shared, fixed Firestore collection for this application.
-            <br>Admin User ID: <span id="current-user-id" class="font-mono text-xs text-indigo-300">N/A</span>
+            Upload images here. Data is saved privately to your current session's ID.
+            <br>Session User ID: <span id="current-user-id" class="font-mono text-xs text-indigo-300">Loading...</span>
         </p>
 
         <!-- Hidden File Input -->
@@ -112,7 +126,7 @@
             <button id="upload-button" class="btn btn-primary px-8 py-3 rounded-lg shadow-md disabled:opacity-50" disabled>
                 Upload & Save Image (To Firestore)
             </button>
-            <button id="link-button" class="btn btn-primary bg-indigo-500 hover:bg-indigo-600 px-8 py-3 rounded-lg shadow-md disabled:opacity-50" disabled>
+            <button id="link-button" class="btn btn-secondary px-8 py-3 rounded-lg shadow-md disabled:opacity-50" disabled>
                 Generate Data URL Link
             </button>
         </div>
@@ -134,35 +148,33 @@
 
     <script>
         const {
-            initializeApp, getFirestore, collection, addDoc, onSnapshot, 
+            initializeApp, getAuth, signInAnonymously, 
+            getFirestore, collection, addDoc, onSnapshot, 
             query, serverTimestamp, setLogLevel
         } = window.firebase;
 
-        // =========================================================================================
-        // --- CONSTANTS ---
-        // This is a fixed ID used to ensure persistence without authentication.
-        const CUSTOM_APP_ID = 'image-uploader-46f04'; 
-        const CUSTOM_USER_ID = 'HARDCODED_ADMIN_USER'; // Fixed user ID for the non-authenticated session
-
-        // --- FIREBASE CONFIGURATION (YOUR LIVE KEYS) ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyBJELImxh2a5nx85UCHIxHgiD-H-v8LsxE", // YOUR KEY
-            projectId: "image-uploader-46f04", // YOUR PROJECT ID
-        };
-        // ----------------------------------------------
+        // --- CONSTANTS & CONFIGURATION ---
         
-        const appId = firebaseConfig.projectId || CUSTOM_APP_ID;
+        // Prioritize global Canvas environment variables
+        const envAppId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const envConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "AIzaSyBJELImxh2a5nx85UCHIxHgiD-H-v8LsxE", // Fallback to user's provided key
+            projectId: "image-uploader-46f04", // Fallback to user's provided project id
+        };
+
+        const appId = envAppId;
+        const firebaseConfig = envConfig;
 
         // --- Global State ---
         let db = null;
-        let userId = CUSTOM_USER_ID; // Always set to the fixed ID
+        let auth = null;
+        let userId = 'Loading...'; // Will be set after anonymous sign-in
         let unsubscribeSnapshot = null; 
         
         let selectedFile = null;
         let uploadedImageUrl = null;
 
         // --- UI Elements ---
-        const uploaderView = document.getElementById('uploader-view');
         const currentUserIdDisplay = document.getElementById('current-user-id');
         const fileInput = document.getElementById('file-input');
         const dropZone = document.getElementById('drop-zone');
@@ -178,7 +190,7 @@
         // --- Utility Functions ---
 
         /** Displays a message in the status box. */
-        function showMessage(type, message, target, link = null) {
+        function showMessage(type, message, link = null) {
             const box = uploaderMessageBox;
             let border, bg, text;
             switch(type) {
@@ -207,37 +219,45 @@
             el.select();
             document.execCommand('copy');
             document.body.removeChild(el);
-            showMessage('success', `Data URL for "${name}" copied to clipboard!`, 'uploader');
+            showMessage('success', `Data URL for "${name}" copied to clipboard!`);
         };
 
         // --- Firebase Initialization ---
 
-        function initFirebase() {
+        async function initFirebase() {
+            loadingStatus.textContent = 'Initializing Firebase services...';
             try {
-                // setLogLevel('Debug'); // Uncomment for debugging
+                // setLogLevel('Debug'); // Use this for debugging if needed
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
+                auth = getAuth(app);
                 
+                // 1. Force Anonymous Sign-In to get a valid user ID for Firestore
+                const userCredential = await signInAnonymously(auth);
+                userId = userCredential.user.uid;
                 currentUserIdDisplay.textContent = userId;
+                
+                loadingStatus.textContent = 'Loading history...';
+                
+                // 2. Load and listen to the images
                 loadImagesFromFirestore();
             } catch (error) {
-                console.error("Error initializing Firebase:", error);
-                loadingStatus.textContent = 'ERROR: Database initialization failed.';
+                console.error("Error initializing Firebase or signing in anonymously:", error);
+                loadingStatus.textContent = 'ERROR: Database services failed to start. Check console.';
+                showMessage('error', 'Critical Error: Could not connect to database services.', null);
             }
         }
 
         // --- Uploader Data Logic (Firestore) ---
         
         function loadImagesFromFirestore() {
-            if (!db || !userId) return;
+            if (!db || !userId || userId === 'Loading...') return;
 
-            // Firestore Path: /artifacts/{appId}/users/{userId}/uploaded_images
-            // This path uses the fixed CUSTOM_USER_ID, allowing data to be persisted.
+            // Path: /artifacts/{appId}/users/{userId}/uploaded_images
+            // This ensures data is stored privately for the anonymous session ID.
             const collectionPath = `artifacts/${appId}/users/${userId}/uploaded_images`;
             const imagesRef = collection(db, collectionPath);
             const q = imagesRef;
-
-            loadingStatus.textContent = 'Loading history...';
 
             if (unsubscribeSnapshot) {
                 unsubscribeSnapshot(); 
@@ -269,7 +289,7 @@
 
         async function saveImageToFirestore(name, url) {
             if (!db || !userId) {
-                showMessage('error', 'Database connection not ready.', 'uploader');
+                showMessage('error', 'Database connection not ready. Please refresh the page.', 'uploader');
                 return;
             }
 
@@ -374,16 +394,19 @@
             if (!uploadedImageUrl || !selectedFile) return;
 
             uploadButton.disabled = linkButton.disabled = true;
+            linkButton.disabled = true;
+
             showMessage('loading', `Uploading "${selectedFile.name}" and saving to history...`, 'uploader');
 
             await saveImageToFirestore(selectedFile.name, uploadedImageUrl);
 
-            uploadButton.disabled = linkButton.disabled = false;
+            uploadButton.disabled = false;
+            linkButton.disabled = false;
         });
 
         linkButton.addEventListener('click', () => {
             if (!uploadedImageUrl) return;
-            showMessage('info', 'Data URL Generated for Current Selection. The link is valid for any image saved in history too.', 'uploader', uploadedImageUrl);
+            showMessage('info', 'Data URL Generated for Current Selection. Click on any row in the history to copy its link.', uploadedImageUrl);
         });
 
         // Drag and Drop Logic
