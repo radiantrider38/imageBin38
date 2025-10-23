@@ -3,239 +3,548 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fixed Image Uploader</title>
+    <title>Secure Admin Image Uploader</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Combined Firebase Imports for Auth and Firestore -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, signInWithEmailAndPassword, sendPasswordResetEmail, 
+            onAuthStateChanged, signOut
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, collection, addDoc, onSnapshot, query, 
+            serverTimestamp, setLogLevel
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Expose combined Firebase objects globally
+        window.firebase = {
+            initializeApp, getAuth, signInWithEmailAndPassword, sendPasswordResetEmail,
+            onAuthStateChanged, signOut, getFirestore, collection, addDoc, onSnapshot, 
+            query, serverTimestamp, setLogLevel
+        };
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
+        /* --- General Theme & Layout --- */
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f7f9fc;
+            background-color: #1f2937; /* Slate-800 equivalent */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
         }
+        .app-container {
+            background-color: #374151; /* Slate-700 */
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+        }
+        
+        /* --- Login Specific Styles --- */
+        .input-field {
+            background-color: #1f2937; /* Slate-800 */
+            color: #d1d5db; /* Gray-300 */
+            border: 1px solid #4b5563; /* Gray-600 */
+        }
+        .input-field:focus {
+            border-color: #6366f1; /* Indigo-500 */
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.5);
+        }
+        .btn-text-link {
+            transition: color 0.2s;
+            color: #93c5fd; /* Blue-300 */
+        }
+        .btn-text-link:hover {
+            color: #60a5fa; /* Blue-400 */
+        }
+        
+        /* --- Uploader Specific Styles --- */
         #drop-zone {
-            transition: all 0.2s ease-in-out;
+            transition: all 0.3s ease-in-out;
             border-style: dashed;
+            background-color: #374151; /* Slate-700 */
         }
         #drop-zone.hover {
-            border-color: #3b82f6;
-            background-color: #eff6ff;
+            border-color: #6366f1; /* Indigo-500 */
+            background-color: #4b5563; /* Slate-600 */
+            transform: scale(1.02);
         }
-        .btn-upload:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        
+        /* --- Shared Button Styles --- */
+        .btn {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            font-weight: 600;
+        }
+        .btn-primary {
+            background-color: #4f46e5; /* Indigo-600 */
+            box-shadow: 0 4px 10px -2px rgba(79, 70, 229, 0.4);
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #4338ca; /* Indigo-700 */
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px -3px rgba(79, 70, 229, 0.6);
+        }
+        .btn-secondary {
+            background-color: #374151; /* Slate-700 */
+            color: #d1d5db; /* Gray-300 */
+        }
+        .btn-secondary:hover {
+            background-color: #4b5563; /* Slate-600 */
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px -3px rgba(0, 0, 0, 0.3);
+        }
+        /* Custom scrollbar for the table container */
+        #uploaded-images-list::-webkit-scrollbar {
+            height: 6px;
+        }
+        #uploaded-images-list::-webkit-scrollbar-thumb {
+            background: #6366f1;
+            border-radius: 3px;
         }
     </style>
 </head>
-<body class="min-h-screen p-4 md:p-8 flex items-center justify-center">
+<body>
 
-    <div class="w-full max-w-2xl bg-white shadow-xl rounded-xl p-6 md:p-10 border border-gray-100">
+    <div id="login-view" class="w-full max-w-md p-8 rounded-xl app-container mx-4 hidden">
+        <h1 class="text-3xl font-bold text-gray-100 text-center mb-2">Admin Panel</h1>
+        <p class="text-gray-400 text-center mb-8">Sign in to manage images</p>
 
-        <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Image Bin & Uploader</h1>
-        <p class="text-gray-500 mb-8 text-center">Select an image or drag-and-drop it below. Preview is instant, and 'Upload' generates a persistent data URL.</p>
+        <div id="login-message-box" class="p-4 rounded-lg border-l-4 border-gray-600 bg-gray-700 text-gray-300 hidden mb-6"></div>
+
+        <form id="login-form" class="space-y-4">
+            <div>
+                <label for="login-email" class="block text-sm font-medium text-gray-300 mb-1">Email (Administrator)</label>
+                <input type="email" id="login-email" name="email" required class="w-full px-4 py-2 rounded-lg input-field focus:outline-none" placeholder="admin@yourdomain.com">
+            </div>
+            <div>
+                <label for="login-password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
+                <input type="password" id="login-password" name="password" required class="w-full px-4 py-2 rounded-lg input-field focus:outline-none" placeholder="••••••••">
+            </div>
+
+            <div class="pt-4">
+                <button type="submit" id="login-btn" class="btn btn-primary w-full text-white font-semibold py-2.5 rounded-lg">
+                    Log In
+                </button>
+            </div>
+        </form>
+
+        <div class="mt-4 text-center">
+            <button id="reset-password-btn" class="btn-text-link text-sm font-medium">
+                Forgot Password? (Setup/Reset)
+            </button>
+        </div>
+    </div>
+
+    <div id="uploader-view" class="w-full max-w-4xl p-6 md:p-10 rounded-xl app-container hidden mt-10">
+
+        <div class="flex justify-between items-center mb-6 border-b border-gray-700 pb-4">
+            <h1 class="text-3xl font-bold text-gray-100">Image Upload Bin <span class="text-indigo-400">2.0</span></h1>
+            <button id="logout-btn" class="btn btn-secondary px-4 py-2 text-sm">
+                Log Out
+            </button>
+        </div>
+        <p class="text-gray-400 mb-8">Upload images and manage your data links. User ID: <span id="current-user-id" class="font-mono text-xs text-indigo-300">N/A</span></p>
 
         <!-- Hidden File Input -->
         <input type="file" id="file-input" accept="image/*" class="hidden">
 
         <!-- Drop Zone & File Selection -->
-        <div id="drop-zone" class="p-8 text-center border-2 border-gray-300 rounded-lg cursor-pointer transition duration-300 hover:border-blue-500"
+        <div id="drop-zone" class="p-8 text-center border-2 border-indigo-400 rounded-xl cursor-pointer hover:shadow-lg transition duration-300"
              onclick="document.getElementById('file-input').click()">
-            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v8"></path></svg>
-            <p class="mt-2 text-sm text-gray-600"><span class="font-semibold text-blue-600">Click to select file</span> or drag and drop</p>
-            <p class="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 10MB</p>
+            <svg class="mx-auto h-12 w-12 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v8"></path></svg>
+            <p class="mt-2 text-sm text-gray-300"><span class="font-semibold text-indigo-400">Click to select file</span> or drag and drop</p>
+            <p class="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 10MB | Preview is Local</p>
         </div>
 
         <!-- Preview Container -->
-        <div id="preview-section" class="mt-8 hidden">
-            <h2 class="text-xl font-semibold text-gray-700 mb-4">Image Preview</h2>
-            <div id="image-preview-container" class="relative w-full h-64 bg-gray-100 rounded-lg overflow-hidden border border-gray-300">
+        <div id="preview-section" class="mt-8 hidden p-4 bg-gray-700 rounded-lg">
+            <h2 class="text-xl font-semibold text-gray-100 mb-4">Live Preview</h2>
+            <div id="image-preview-container" class="relative w-full h-72 bg-gray-900 rounded-lg overflow-hidden border border-gray-600 flex items-center justify-center">
                 <!-- Image will be inserted here -->
             </div>
-            <p id="file-name" class="text-sm text-gray-600 mt-2 font-medium"></p>
+            <p id="file-name" class="text-sm text-gray-300 mt-3 font-medium truncate"></p>
         </div>
 
-        <!-- Action Button -->
-        <div class="mt-6 flex justify-center">
-            <button id="upload-button" class="btn-upload px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition duration-150 ease-in-out disabled:opacity-50" disabled>
-                Simulate Upload & Generate Link
+        <!-- Action Buttons -->
+        <div class="mt-6 flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+            <button id="upload-button" class="btn btn-primary px-8 py-3 rounded-lg shadow-md disabled:opacity-50" disabled>
+                Upload Image (Save to Firestore)
+            </button>
+            <button id="link-button" class="btn btn-secondary px-8 py-3 rounded-lg shadow-md disabled:opacity-50" disabled>
+                Generate Data URL Link
             </button>
         </div>
 
         <!-- Status Message Box -->
-        <div id="message-box" class="mt-8 p-4 rounded-lg border-l-4 border-gray-400 bg-gray-50 text-gray-700 hidden">
+        <div id="uploader-message-box" class="mt-8 p-4 rounded-lg border-l-4 border-gray-600 bg-gray-700 text-gray-300 hidden">
             <!-- Messages appear here -->
         </div>
 
+        <!-- Uploaded Images List (Firestore Data) -->
+        <div id="list-section" class="mt-12">
+            <h2 class="text-xl font-bold text-gray-100 mb-4 border-b border-indigo-500 pb-2">Uploaded Images History</h2>
+            <div id="uploaded-images-list" class="overflow-x-auto">
+                <!-- Image list table will be rendered here -->
+            </div>
+            <p id="loading-status" class="text-gray-400 mt-4 text-center">Awaiting Admin Login...</p>
+        </div>
     </div>
 
     <script>
+        const {
+            initializeApp, getAuth, signInWithEmailAndPassword, sendPasswordResetEmail,
+            onAuthStateChanged, signOut, getFirestore, collection, addDoc, onSnapshot, 
+            query, serverTimestamp, setLogLevel
+        } = window.firebase;
+
+        // Constants from the environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-image-bin-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+
+        // --- Global State ---
+        let db = null;
+        let auth = null;
+        let userId = null;
+        let unsubscribeSnapshot = null; // To clean up Firestore listener
+
+        // --- UI Elements ---
+        const loginView = document.getElementById('login-view');
+        const uploaderView = document.getElementById('uploader-view');
+        const loginForm = document.getElementById('login-form');
+        const loginEmailInput = document.getElementById('login-email');
+        const loginPasswordInput = document.getElementById('login-password');
+        const loginBtn = document.getElementById('login-btn');
+        const resetPasswordBtn = document.getElementById('reset-password-btn');
+        const loginMessageBox = document.getElementById('login-message-box');
+        
+        const logoutBtn = document.getElementById('logout-btn');
+        const currentUserIdDisplay = document.getElementById('current-user-id');
         const fileInput = document.getElementById('file-input');
         const dropZone = document.getElementById('drop-zone');
         const previewSection = document.getElementById('preview-section');
         const previewContainer = document.getElementById('image-preview-container');
         const fileNameDisplay = document.getElementById('file-name');
         const uploadButton = document.getElementById('upload-button');
-        const messageBox = document.getElementById('message-box');
-
+        const linkButton = document.getElementById('link-button');
+        const uploaderMessageBox = document.getElementById('uploader-message-box');
+        const imageListContainer = document.getElementById('uploaded-images-list');
+        const loadingStatus = document.getElementById('loading-status');
+        
         let selectedFile = null;
         let uploadedImageUrl = null;
 
         // --- Utility Functions ---
 
-        /** Displays a message in the status box. */
-        function showMessage(type, message, link = null) {
-            let color, icon;
-            switch(type) {
-                case 'error':
-                    color = 'border-red-500 bg-red-50 text-red-700';
-                    icon = `<svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>`;
-                    break;
-                case 'success':
-                    color = 'border-green-500 bg-green-50 text-green-700';
-                    icon = `<svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>`;
-                    break;
-                case 'loading':
-                    color = 'border-yellow-500 bg-yellow-50 text-yellow-700';
-                    icon = `<svg class="animate-spin w-5 h-5 mr-2 text-yellow-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
-                    break;
-                default:
-                    color = 'border-gray-400 bg-gray-50 text-gray-700';
-                    icon = `<svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>`;
-            }
-
-            let linkHtml = link ? `<a href="${link}" target="_blank" class="text-blue-600 underline hover:text-blue-800 break-all mt-2 block">View Data URL Image (Click to copy)</a>` : '';
-
-            messageBox.className = `mt-8 p-4 rounded-lg border-l-4 ${color} flex items-start hidden`;
-            messageBox.innerHTML = `
-                <div class="flex items-center">
-                    ${icon}
-                    <p class="font-medium">${message}</p>
-                </div>
-                ${linkHtml}
-            `;
-            messageBox.classList.remove('hidden');
-
-            // Add copy functionality for the link
-            if (link) {
-                const linkElement = messageBox.querySelector('a');
-                linkElement.onclick = (e) => {
-                    e.preventDefault();
-                    // Using document.execCommand('copy') for better compatibility in iFrames/sandbox environments
-                    const el = document.createElement('textarea');
-                    el.value = link;
-                    document.body.appendChild(el);
-                    el.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(el);
-                    showMessage('success', 'Image Data URL copied to clipboard!', link);
-                };
+        function toggleView(isAuthenticated) {
+            if (isAuthenticated) {
+                loginView.classList.add('hidden');
+                uploaderView.classList.remove('hidden');
+            } else {
+                uploaderView.classList.add('hidden');
+                loginView.classList.remove('hidden');
             }
         }
 
-        /** Handles file selection and generates the preview. */
-        function handleFile(file) {
-            if (!file || !file.type.startsWith('image/')) {
-                showMessage('error', 'Invalid file type. Please select an image (JPG, PNG, GIF).');
-                selectedFile = null;
-                uploadButton.disabled = true;
-                previewSection.classList.add('hidden');
+        /** Displays a message in the status box. */
+        function showMessage(type, message, target, link = null) {
+            const box = target === 'login' ? loginMessageBox : uploaderMessageBox;
+            let border, bg, text;
+            switch(type) {
+                case 'error':
+                    border = 'border-red-500'; bg = 'bg-red-900/40'; text = 'text-red-300'; break;
+                case 'success':
+                    border = 'border-green-500'; bg = 'bg-green-900/40'; text = 'text-green-300'; break;
+                case 'loading':
+                    border = 'border-indigo-500'; bg = 'bg-indigo-900/40'; text = 'text-indigo-300'; break;
+                default: // info
+                    border = 'border-gray-500'; bg = 'bg-gray-700'; text = 'text-gray-300';
+            }
+
+            let linkHtml = link ? `<a href="#" onclick="window.copyLink('${link}', 'Current Selection')" class="text-indigo-400 underline hover:text-indigo-300 break-all mt-2 block">Data URL (Click to copy)</a>` : '';
+
+            box.className = `p-4 rounded-lg border-l-4 ${border} ${bg} ${text} mb-6`;
+            box.innerHTML = `<p>${message}</p>${linkHtml}`;
+            box.classList.remove('hidden');
+        }
+        
+        // Expose copyLink to global scope for use in onclick
+        window.copyLink = (link, name) => {
+            const el = document.createElement('textarea');
+            el.value = link;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            showMessage('success', `Data URL for "${name}" copied to clipboard!`, 'uploader');
+        };
+
+        // --- Firebase Initialization and Authentication ---
+
+        function initFirebase() {
+            try {
+                // setLogLevel('Debug');
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                // Setup Auth State Listener
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        // User is signed in (Admin)
+                        userId = user.uid;
+                        currentUserIdDisplay.textContent = userId;
+                        toggleView(true);
+                        loadImagesFromFirestore();
+                        showMessage('info', `Welcome, ${user.email}. Image history loaded.`, 'uploader');
+                    } else {
+                        // User is signed out
+                        userId = null;
+                        currentUserIdDisplay.textContent = 'N/A';
+                        toggleView(false);
+                        if (unsubscribeSnapshot) {
+                            unsubscribeSnapshot(); // Stop listening to old user's data
+                        }
+                        imageListContainer.innerHTML = '';
+                        loadingStatus.textContent = 'Awaiting Admin Login...';
+                        showMessage('info', 'Firebase Authentication Ready. Enter your administrator credentials.', 'login');
+                    }
+                });
+            } catch (error) {
+                console.error("Error initializing Firebase:", error);
+                showMessage('error', 'Could not initialize Authentication/Database services. Check console for details.', 'login');
+            }
+        }
+
+        // --- Uploader Data Logic (Firestore) ---
+        
+        function loadImagesFromFirestore() {
+            if (!db || !userId) return;
+
+            // Firestore Path: /artifacts/{appId}/users/{userId}/uploaded_images
+            const collectionPath = `artifacts/${appId}/users/${userId}/uploaded_images`;
+            const imagesRef = collection(db, collectionPath);
+            const q = imagesRef;
+
+            loadingStatus.textContent = 'Loading history...';
+
+            // Subscribe to real-time changes
+            unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
+                const uploadedFiles = [];
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const timestamp = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleString() : 'N/A';
+                    uploadedFiles.push({
+                        id: doc.id,
+                        name: data.name,
+                        url: data.url,
+                        time: timestamp
+                    });
+                });
+                uploadedFiles.sort((a, b) => new Date(b.time) - new Date(a.time));
+                renderImageList(uploadedFiles);
+            }, (error) => {
+                console.error("Error listening to Firestore:", error);
+                loadingStatus.textContent = "Error fetching history: Data sync failed.";
+            });
+        }
+
+        async function saveImageToFirestore(name, url) {
+            if (!db || !userId) {
+                showMessage('error', 'Database connection not ready. Please log in again.', 'uploader');
                 return;
             }
 
-            if (file.size > 10 * 1024 * 1024) { // 10MB limit
-                showMessage('error', 'File size exceeds the 10MB limit.');
+            const collectionPath = `artifacts/${appId}/users/${userId}/uploaded_images`;
+            const imagesRef = collection(db, collectionPath);
+
+            try {
+                await addDoc(imagesRef, {
+                    name: name,
+                    url: url,
+                    timestamp: serverTimestamp()
+                });
+                showMessage('success', `Image "${name}" successfully uploaded and saved to history!`, 'uploader');
+            } catch (error) {
+                console.error("Error writing document:", error);
+                showMessage('error', `Upload failed: Data too large or write permission denied. ${error.message}`, 'uploader');
+            }
+        }
+        
+        // --- Uploader UI Rendering ---
+        
+        function renderImageList(files) {
+            loadingStatus.classList.add('hidden');
+            if (files.length === 0) {
+                imageListContainer.innerHTML = '<p class="text-gray-500 text-center p-4 bg-gray-700 rounded-lg">No images uploaded yet.</p>';
+                return;
+            }
+
+            const tableHtml = `
+                <table class="min-w-full divide-y divide-gray-700 rounded-xl overflow-hidden shadow-lg">
+                    <thead class="bg-indigo-600/70">
+                        <tr>
+                            <th class="px-3 py-3 text-left text-xs font-medium text-white uppercase tracking-wider hidden md:table-cell">ID</th>
+                            <th class="px-3 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Image</th>
+                            <th class="px-3 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">File Name</th>
+                            <th class="px-3 py-3 text-left text-xs font-medium text-white uppercase tracking-wider hidden sm:table-cell">Time</th>
+                            <th class="px-3 py-3 text-center text-xs font-medium text-white uppercase tracking-wider">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-gray-800 divide-y divide-gray-700">
+                        ${files.map(file => `
+                            <tr class="hover:bg-gray-700 transition duration-150 cursor-pointer" onclick="copyLink('${file.url}', '${file.name}')">
+                                <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-400 hidden md:table-cell truncate">${file.id}</td>
+                                <td class="px-3 py-3">
+                                    <img src="${file.url}" alt="Thumbnail" class="w-10 h-10 object-cover rounded-md border border-gray-600">
+                                </td>
+                                <td class="px-3 py-3 text-sm font-medium text-gray-300 truncate max-w-xs sm:max-w-none">
+                                    ${file.name}
+                                    <span class="text-xs text-indigo-400 block mt-1">Click row to copy link</span>
+                                </td>
+                                <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-500 hidden sm:table-cell">${file.time}</td>
+                                <td class="px-3 py-3 text-center whitespace-nowrap">
+                                    <button onclick="event.stopPropagation(); copyLink('${file.url}', '${file.name}')" class="text-indigo-400 hover:text-indigo-300 text-sm font-medium transition duration-150 p-1 rounded-md hover:bg-gray-600">
+                                        Copy Link
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            imageListContainer.innerHTML = tableHtml;
+        }
+
+        // --- Combined Event Listeners (Login) ---
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = loginEmailInput.value.trim();
+            const password = loginPasswordInput.value;
+
+            if (!email || !password) {
+                showMessage('error', 'Please enter both email and password.', 'login');
+                return;
+            }
+
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Logging In...';
+            showMessage('loading', 'Attempting to sign in...', 'login');
+
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                // AuthStateChanged listener handles the view switch and data load on success
+                loginBtn.textContent = 'Success!';
+            } catch (error) {
+                console.error("Login error:", error.code, error.message);
+                let errorMessage = 'Login failed. Please check your credentials.';
+                if (error.code === 'auth/user-not-found') {
+                    errorMessage = 'User not found. Check email or use Reset link to set up.';
+                } else if (error.code === 'auth/wrong-password') {
+                    errorMessage = 'Incorrect password.';
+                }
+                showMessage('error', errorMessage, 'login');
+                loginBtn.textContent = 'Log In';
+                loginBtn.disabled = false;
+            }
+        });
+
+        resetPasswordBtn.addEventListener('click', async () => {
+            const email = loginEmailInput.value.trim();
+
+            if (!email) {
+                showMessage('info', 'Enter your administrator email in the field above to receive the password reset link.', 'login');
+                return;
+            }
+
+            resetPasswordBtn.disabled = true;
+            showMessage('loading', `Sending password reset link to ${email}...`, 'login');
+
+            try {
+                await sendPasswordResetEmail(auth, email);
+                showMessage('success', `Password reset email successfully sent to ${email}. Check your inbox (and spam folder) to set up or change your password.`, 'login');
+            } catch (error) {
+                console.error("Password reset error:", error.code, error.message);
+                let errorMessage = 'Password setup/reset failed.';
+                if (error.code === 'auth/user-not-found') {
+                    errorMessage = 'User not registered. Cannot send reset link.';
+                }
+                showMessage('error', errorMessage, 'login');
+            } finally {
+                resetPasswordBtn.disabled = false;
+            }
+        });
+        
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+                // AuthStateChanged listener handles the view switch on sign out
+            } catch (error) {
+                console.error("Logout error:", error);
+                showMessage('error', 'Logout failed. Please try again.', 'uploader');
+            }
+        });
+
+        // --- Combined Event Listeners (Uploader) ---
+
+        function handleFile(file) {
+            if (!file || !file.type.startsWith('image/') || file.size > 10 * 1024 * 1024) {
+                showMessage('error', 'Invalid file (must be image < 10MB).', 'uploader');
                 selectedFile = null;
-                uploadButton.disabled = true;
+                uploadButton.disabled = linkButton.disabled = true;
                 previewSection.classList.add('hidden');
                 return;
             }
 
             selectedFile = file;
-            fileNameDisplay.textContent = `Selected: ${file.name}`;
-            uploadButton.disabled = false;
+            fileNameDisplay.textContent = `Selected: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+            uploadButton.disabled = linkButton.disabled = false;
 
             const reader = new FileReader();
             reader.onload = (e) => {
-                const imageUrl = e.target.result;
-                uploadedImageUrl = imageUrl;
-
-                // Update preview
-                previewContainer.innerHTML = `<img src="${imageUrl}" alt="Image Preview" class="w-full h-full object-contain">`;
+                uploadedImageUrl = e.target.result;
+                previewContainer.innerHTML = `<img src="${uploadedImageUrl}" alt="Image Preview" class="w-full h-full object-contain">`;
                 previewSection.classList.remove('hidden');
-
-                // Clear previous success message
-                messageBox.classList.add('hidden');
+                uploaderMessageBox.classList.add('hidden');
             };
             reader.readAsDataURL(file);
         }
 
-        // --- Event Handlers ---
-
         fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            handleFile(file);
+            handleFile(e.target.files[0]);
         });
 
-        uploadButton.addEventListener('click', () => {
-            if (!uploadedImageUrl) {
-                showMessage('error', 'No image selected to upload.');
-                return;
-            }
+        uploadButton.addEventListener('click', async () => {
+            if (!uploadedImageUrl || !selectedFile) return;
 
-            uploadButton.disabled = true;
-            showMessage('loading', 'Uploading image...');
+            uploadButton.disabled = linkButton.disabled = true;
+            showMessage('loading', `Uploading "${selectedFile.name}" and saving to history...`, 'uploader');
 
-            // Simulate network latency (2 seconds)
-            setTimeout(() => {
-                uploadButton.disabled = false;
-                // Since there is no backend, the "uploaded" image is the Data URL itself.
-                showMessage('success', 'Upload Simulated! Your image is now available as a Data URL:', uploadedImageUrl);
-            }, 2000);
+            await saveImageToFirestore(selectedFile.name, uploadedImageUrl);
+
+            uploadButton.disabled = linkButton.disabled = false;
         });
 
+        linkButton.addEventListener('click', () => {
+            if (!uploadedImageUrl) return;
+            showMessage('info', 'Data URL Generated for Current Selection.', 'uploader', uploadedImageUrl);
+        });
 
-        // --- Drag and Drop Logic ---
-
+        // Drag and Drop Logic
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             dropZone.addEventListener(eventName, preventDefaults, false);
             document.body.addEventListener(eventName, preventDefaults, false);
         });
+        function preventDefaults (e) { e.preventDefault(); e.stopPropagation(); }
+        ['dragenter', 'dragover'].forEach(eventName => { dropZone.addEventListener(eventName, () => dropZone.classList.add('hover'), false); });
+        ['dragleave', 'drop'].forEach(eventName => { dropZone.addEventListener(eventName, () => dropZone.classList.remove('hover'), false); });
+        dropZone.addEventListener('drop', (e) => { handleFile(e.dataTransfer.files[0]); }, false);
 
-        function preventDefaults (e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
-        ['dragenter', 'dragover'].forEach(eventName => {
-            dropZone.addEventListener(eventName, highlight, false);
-        });
-
-        ['dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, unhighlight, false);
-        });
-
-        function highlight(e) {
-            dropZone.classList.add('hover');
-        }
-
-        function unhighlight(e) {
-            dropZone.classList.remove('hover');
-        }
-
-        dropZone.addEventListener('drop', handleDrop, false);
-
-        function handleDrop(e) {
-            const dt = e.dataTransfer;
-            const files = dt.files;
-
-            // Only process the first file if multiple were dropped
-            if (files.length > 0) {
-                handleFile(files[0]);
-            }
-        }
-
-        // Initial state message
-        showMessage('info', 'Ready to accept an image file.');
-
+        // --- Initialization ---
+        window.onload = initFirebase;
     </script>
 
 </body>
