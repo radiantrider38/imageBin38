@@ -6,24 +6,7 @@
     <title>Standalone Image Uploader Bin (Fixed)</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Combined Firebase Imports (Auth and Firestore) -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { 
-            getAuth, signInAnonymously 
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { 
-            getFirestore, collection, addDoc, onSnapshot, 
-            query, serverTimestamp, setLogLevel
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Expose combined Firebase objects globally
-        window.firebase = {
-            initializeApp, getAuth, signInAnonymously, 
-            getFirestore, collection, addDoc, onSnapshot, 
-            query, serverTimestamp, setLogLevel
-        };
-    </script>
+    
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         /* --- General Theme & Layout --- */
@@ -146,19 +129,22 @@
         </div>
     </div>
 
-    <script>
-        const {
-            initializeApp, getAuth, signInAnonymously, 
+    <!-- Consolidated Module Script -->
+    <script type="module">
+        // Direct Firebase SDK imports - No global exports needed
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
             getFirestore, collection, addDoc, onSnapshot, 
             query, serverTimestamp, setLogLevel
-        } = window.firebase;
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- CONSTANTS & CONFIGURATION ---
         
-        // Prioritize global Canvas environment variables
+        // Use global environment variables for Firebase Config and App ID
         const envAppId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const envConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-            apiKey: "AIzaSyBJELImxh2a5nx85UCHIxHgiD-H-v8LsxE", // Fallback to user's provided key
+            apiKey: "", // Using empty string as placeholder
             projectId: "image-uploader-46f04", // Fallback to user's provided project id
         };
 
@@ -211,7 +197,7 @@
             box.classList.remove('hidden');
         }
         
-        // Expose copyLink to global scope for use in onclick
+        // Expose copyLink globally for use in HTML onclick attributes
         window.copyLink = (link, name) => {
             const el = document.createElement('textarea');
             el.value = link;
@@ -244,7 +230,7 @@
             } catch (error) {
                 console.error("Error initializing Firebase or signing in anonymously:", error);
                 loadingStatus.textContent = 'ERROR: Database services failed to start. Check console.';
-                showMessage('error', 'Critical Error: Could not connect to database services.', null);
+                showMessage('error', 'Critical Error: Could not connect to database services. Check your project configuration.', null);
             }
         }
 
@@ -254,7 +240,6 @@
             if (!db || !userId || userId === 'Loading...') return;
 
             // Path: /artifacts/{appId}/users/{userId}/uploaded_images
-            // This ensures data is stored privately for the anonymous session ID.
             const collectionPath = `artifacts/${appId}/users/${userId}/uploaded_images`;
             const imagesRef = collection(db, collectionPath);
             const q = imagesRef;
@@ -289,7 +274,7 @@
 
         async function saveImageToFirestore(name, url) {
             if (!db || !userId) {
-                showMessage('error', 'Database connection not ready. Please refresh the page.', 'uploader');
+                showMessage('error', 'Database connection not ready. Please refresh the page.');
                 return;
             }
 
@@ -302,13 +287,13 @@
                     url: url,
                     timestamp: serverTimestamp()
                 });
-                showMessage('success', `Image "${name}" successfully uploaded and saved!`, 'uploader');
+                showMessage('success', `Image "${name}" successfully uploaded and saved!`);
             } catch (error) {
                 console.error("Error writing document:", error);
                 let errorMessage = error.message.includes('Value for argument "data" is not a valid Firestore document') 
                                  ? 'Upload failed: Data URL size exceeds Firestore document limit (1MB).' 
                                  : `Upload failed: ${error.message}`;
-                showMessage('error', errorMessage, 'uploader');
+                showMessage('error', errorMessage);
             }
         }
         
@@ -365,7 +350,7 @@
             const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 
             if (!file || !file.type.startsWith('image/') || file.size > MAX_SIZE_BYTES) {
-                showMessage('error', `Invalid file (must be image < ${MAX_SIZE_MB}MB).`, 'uploader');
+                showMessage('error', `Invalid file (must be image < ${MAX_SIZE_MB}MB).`);
                 selectedFile = null;
                 uploadButton.disabled = linkButton.disabled = true;
                 previewSection.classList.add('hidden');
@@ -394,9 +379,8 @@
             if (!uploadedImageUrl || !selectedFile) return;
 
             uploadButton.disabled = linkButton.disabled = true;
-            linkButton.disabled = true;
 
-            showMessage('loading', `Uploading "${selectedFile.name}" and saving to history...`, 'uploader');
+            showMessage('loading', `Uploading "${selectedFile.name}" and saving to history...`);
 
             await saveImageToFirestore(selectedFile.name, uploadedImageUrl);
 
