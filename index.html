@@ -131,30 +131,44 @@
 
     <!-- Consolidated Module Script -->
     <script type="module">
-        // Direct Firebase SDK imports - No global exports needed
+        // Direct Firebase SDK imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { 
             getFirestore, collection, addDoc, onSnapshot, 
-            query, serverTimestamp, setLogLevel
+            serverTimestamp 
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- CONSTANTS & CONFIGURATION ---
         
-        // Use global environment variables for Firebase Config and App ID
         const envAppId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const envConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-            apiKey: "", // Using empty string as placeholder
-            projectId: "image-uploader-46f04", // Fallback to user's provided project id
-        };
+        let configToUse = null;
+
+        // CRITICAL FIX: Prioritize the injected config. Use a functional fallback if necessary.
+        if (typeof __firebase_config !== 'undefined') {
+            try {
+                configToUse = JSON.parse(__firebase_config);
+            } catch (e) {
+                console.error("Failed to parse __firebase_config:", e);
+                // Fallback to a minimal, non-empty configuration structure
+                configToUse = { apiKey: "PARSE_ERROR_FALLBACK", projectId: "image-uploader-46f04" };
+            }
+        } else {
+            // Fallback for local testing if env vars are missing. 
+            // Using a dummy key to bypass the 'empty key' error.
+            configToUse = { 
+                apiKey: "AIzaSyBJELImxh2a5nx85UCHIxHgiD-H-v8LsxE", 
+                projectId: "image-uploader-46f04" 
+            };
+        }
 
         const appId = envAppId;
-        const firebaseConfig = envConfig;
+        const firebaseConfig = configToUse;
 
         // --- Global State ---
         let db = null;
         let auth = null;
-        let userId = 'Loading...'; // Will be set after anonymous sign-in
+        let userId = 'Loading...'; 
         let unsubscribeSnapshot = null; 
         
         let selectedFile = null;
@@ -190,6 +204,7 @@
                     border = 'border-gray-500'; bg = 'bg-gray-700'; text = 'text-gray-300';
             }
 
+            // Note: window.copyLink is exposed below to handle the onclick for the link
             let linkHtml = link ? `<a href="#" onclick="window.copyLink('${link}', 'Current Selection')" class="text-indigo-400 underline hover:text-indigo-300 break-all mt-2 block">Data URL (Click to copy)</a>` : '';
 
             box.className = `p-4 rounded-lg border-l-4 ${border} ${bg} ${text} mb-6`;
@@ -197,7 +212,7 @@
             box.classList.remove('hidden');
         }
         
-        // Expose copyLink globally for use in HTML onclick attributes
+        // Expose copyLink globally for use in HTML onclick attributes (must be on window scope)
         window.copyLink = (link, name) => {
             const el = document.createElement('textarea');
             el.value = link;
@@ -213,7 +228,6 @@
         async function initFirebase() {
             loadingStatus.textContent = 'Initializing Firebase services...';
             try {
-                // setLogLevel('Debug'); // Use this for debugging if needed
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
@@ -229,8 +243,8 @@
                 loadImagesFromFirestore();
             } catch (error) {
                 console.error("Error initializing Firebase or signing in anonymously:", error);
-                loadingStatus.textContent = 'ERROR: Database services failed to start. Check console.';
-                showMessage('error', 'Critical Error: Could not connect to database services. Check your project configuration.', null);
+                loadingStatus.textContent = 'ERROR: Database services failed to start. See console for details.';
+                showMessage('error', `Critical Error: Could not connect to database services. Details: ${error.message.substring(0, 80)}...`, null);
             }
         }
 
