@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Token Admin Image Uploader</title>
+    <title>Standalone Image Uploader Bin</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Combined Firebase Imports for Firestore ONLY (Auth is removed) -->
+    <!-- Combined Firebase Imports for Firestore -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { 
@@ -34,17 +34,6 @@
         .app-container {
             background-color: #374151; /* Slate-700 */
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
-        }
-        
-        /* --- Login Specific Styles --- */
-        .input-field {
-            background-color: #1f2937; /* Slate-800 */
-            color: #d1d5db; /* Gray-300 */
-            border: 1px solid #4b5563; /* Gray-600 */
-        }
-        .input-field:focus {
-            border-color: #6366f1; /* Indigo-500 */
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.5);
         }
         
         /* --- Uploader Specific Styles --- */
@@ -75,15 +64,6 @@
             transform: translateY(-2px);
             box-shadow: 0 6px 15px -3px rgba(79, 70, 229, 0.6);
         }
-        .btn-secondary {
-            background-color: #374151; /* Slate-700 */
-            color: #d1d5db; /* Gray-300 */
-        }
-        .btn-secondary:hover {
-            background-color: #4b5563; /* Slate-600 */
-            transform: translateY(-2px);
-            box-shadow: 0 6px 15px -3px rgba(0, 0, 0, 0.3);
-        }
         /* Custom scrollbar for the table container */
         #uploaded-images-list::-webkit-scrollbar {
             height: 6px;
@@ -96,36 +76,16 @@
 </head>
 <body>
 
-    <div id="login-view" class="w-full max-w-md p-8 rounded-xl app-container mx-4">
-        <h1 class="text-3xl font-bold text-gray-100 text-center mb-2">Token Access Panel</h1>
-        <p class="text-gray-400 text-center mb-8">Enter one of the required access codes to proceed.</p>
-
-        <div id="login-message-box" class="p-4 rounded-lg border-l-4 border-gray-600 bg-gray-700 text-gray-300 hidden mb-6"></div>
-
-        <form id="login-form" class="space-y-4">
-            <!-- Single Code Input -->
-            <div>
-                <label for="login-single-code" class="block text-sm font-medium text-gray-300 mb-1">Access Code</label>
-                <input type="text" id="login-single-code" name="code" required class="w-full px-4 py-2 rounded-lg input-field focus:outline-none" placeholder="Enter code here...">
-            </div>
-
-            <div class="pt-4">
-                <button type="submit" id="login-btn" class="btn btn-primary w-full text-white font-semibold py-2.5 rounded-lg">
-                    Verify Code
-                </button>
-            </div>
-        </form>
-    </div>
-
-    <div id="uploader-view" class="w-full max-w-4xl p-6 md:p-10 rounded-xl app-container hidden mt-10">
+    <!-- Main Uploader View - Always Visible -->
+    <div id="uploader-view" class="w-full max-w-4xl p-6 md:p-10 rounded-xl app-container">
 
         <div class="flex justify-between items-center mb-6 border-b border-gray-700 pb-4">
-            <h1 class="text-3xl font-bold text-gray-100">Image Upload Bin <span class="text-indigo-400">2.0</span></h1>
-            <button id="logout-btn" class="btn btn-secondary px-4 py-2 text-sm">
-                Log Out
-            </button>
+            <h1 class="text-3xl font-bold text-gray-100">Image Uploader Bin <span class="text-indigo-400">2.0</span></h1>
         </div>
-        <p class="text-gray-400 mb-8">Upload images and manage your data links. User ID: <span id="current-user-id" class="font-mono text-xs text-indigo-300">N/A</span></p>
+        <p class="text-gray-400 mb-8">
+            Upload images here. Data is saved locally in a shared, fixed Firestore collection for this application.
+            <br>Admin User ID: <span id="current-user-id" class="font-mono text-xs text-indigo-300">N/A</span>
+        </p>
 
         <!-- Hidden File Input -->
         <input type="file" id="file-input" accept="image/*" class="hidden">
@@ -135,7 +95,7 @@
              onclick="document.getElementById('file-input').click()">
             <svg class="mx-auto h-12 w-12 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v8"></path></svg>
             <p class="mt-2 text-sm text-gray-300"><span class="font-semibold text-indigo-400">Click to select file</span> or drag and drop</p>
-            <p class="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 1MB | Preview is Local</p>
+            <p class="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 1MB. Data URL is generated on save.</p>
         </div>
 
         <!-- Preview Container -->
@@ -150,9 +110,9 @@
         <!-- Action Buttons -->
         <div class="mt-6 flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
             <button id="upload-button" class="btn btn-primary px-8 py-3 rounded-lg shadow-md disabled:opacity-50" disabled>
-                Upload Image (Save to Firestore)
+                Upload & Save Image (To Firestore)
             </button>
-            <button id="link-button" class="btn btn-secondary px-8 py-3 rounded-lg shadow-md disabled:opacity-50" disabled>
+            <button id="link-button" class="btn btn-primary bg-indigo-500 hover:bg-indigo-600 px-8 py-3 rounded-lg shadow-md disabled:opacity-50" disabled>
                 Generate Data URL Link
             </button>
         </div>
@@ -164,11 +124,11 @@
 
         <!-- Uploaded Images List (Firestore Data) -->
         <div id="list-section" class="mt-12">
-            <h2 class="text-xl font-bold text-gray-100 mb-4 border-b border-indigo-500 pb-2">Uploaded Images History</h2>
+            <h2 class="text-xl font-bold text-gray-100 mb-4 border-b border-indigo-500 pb-2">Uploaded Images History (Realtime)</h2>
             <div id="uploaded-images-list" class="overflow-x-auto">
                 <!-- Image list table will be rendered here -->
             </div>
-            <p id="loading-status" class="text-gray-400 mt-4 text-center">Awaiting Token Verification...</p>
+            <p id="loading-status" class="text-gray-400 mt-4 text-center">Initializing Database...</p>
         </div>
     </div>
 
@@ -179,42 +139,30 @@
         } = window.firebase;
 
         // =========================================================================================
-        // --- HARDCODED CREDENTIALS & CONFIGURATION ---
-        // ONLY ONE OF THESE THREE VALUES will grant access when entered into the single field.
-        const VALID_TOKEN = ["3008", "AMRS", "101111000000"];
-        
-        // Fixed IDs for Firestore data path when logged in
-        const CUSTOM_APP_ID = 'image-uploader-46f04'; // Using your Project ID as App ID
-        const CUSTOM_USER_ID = 'HARDCODED_ADMIN_USER';
+        // --- CONSTANTS ---
+        // This is a fixed ID used to ensure persistence without authentication.
+        const CUSTOM_APP_ID = 'image-uploader-46f04'; 
+        const CUSTOM_USER_ID = 'HARDCODED_ADMIN_USER'; // Fixed user ID for the non-authenticated session
 
         // --- FIREBASE CONFIGURATION (YOUR LIVE KEYS) ---
-        // Only apiKey and projectId are strictly necessary for Firestore.
         const firebaseConfig = {
             apiKey: "AIzaSyBJELImxh2a5nx85UCHIxHgiD-H-v8LsxE", // YOUR KEY
             projectId: "image-uploader-46f04", // YOUR PROJECT ID
         };
         // ----------------------------------------------
         
-        // This is used for the database path
         const appId = firebaseConfig.projectId || CUSTOM_APP_ID;
-        // ------------------------------------------------------------------
 
         // --- Global State ---
         let db = null;
-        let userId = null;
-        let unsubscribeSnapshot = null; // To clean up Firestore listener
+        let userId = CUSTOM_USER_ID; // Always set to the fixed ID
+        let unsubscribeSnapshot = null; 
+        
+        let selectedFile = null;
+        let uploadedImageUrl = null;
 
         // --- UI Elements ---
-        const loginView = document.getElementById('login-view');
         const uploaderView = document.getElementById('uploader-view');
-        const loginForm = document.getElementById('login-form');
-        // Single Input Element
-        const loginSingleCodeInput = document.getElementById('login-single-code'); 
-        
-        const loginBtn = document.getElementById('login-btn');
-        const loginMessageBox = document.getElementById('login-message-box');
-        
-        const logoutBtn = document.getElementById('logout-btn');
         const currentUserIdDisplay = document.getElementById('current-user-id');
         const fileInput = document.getElementById('file-input');
         const dropZone = document.getElementById('drop-zone');
@@ -226,25 +174,12 @@
         const uploaderMessageBox = document.getElementById('uploader-message-box');
         const imageListContainer = document.getElementById('uploaded-images-list');
         const loadingStatus = document.getElementById('loading-status');
-        
-        let selectedFile = null;
-        let uploadedImageUrl = null;
 
         // --- Utility Functions ---
 
-        function toggleView(isAuthenticated) {
-            if (isAuthenticated) {
-                loginView.classList.add('hidden');
-                uploaderView.classList.remove('hidden');
-            } else {
-                uploaderView.classList.add('hidden');
-                loginView.classList.remove('hidden');
-            }
-        }
-
         /** Displays a message in the status box. */
         function showMessage(type, message, target, link = null) {
-            const box = target === 'login' ? loginMessageBox : uploaderMessageBox;
+            const box = uploaderMessageBox;
             let border, bg, text;
             switch(type) {
                 case 'error':
@@ -275,21 +210,19 @@
             showMessage('success', `Data URL for "${name}" copied to clipboard!`, 'uploader');
         };
 
-        // --- Firebase Initialization (Firestore only) ---
+        // --- Firebase Initialization ---
 
         function initFirebase() {
             try {
                 // setLogLevel('Debug'); // Uncomment for debugging
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
-                showMessage('info', 'System ready. Enter codes to log in.', 'login');
-
-                // Ensure initial view state is correct
-                userId = null;
-                toggleView(false); 
+                
+                currentUserIdDisplay.textContent = userId;
+                loadImagesFromFirestore();
             } catch (error) {
                 console.error("Error initializing Firebase:", error);
-                showMessage('error', 'Could not initialize Database services. Check console for details.', 'login');
+                loadingStatus.textContent = 'ERROR: Database initialization failed.';
             }
         }
 
@@ -299,14 +232,13 @@
             if (!db || !userId) return;
 
             // Firestore Path: /artifacts/{appId}/users/{userId}/uploaded_images
-            // Data is stored under the fixed CUSTOM_USER_ID, accessible only to this app.
+            // This path uses the fixed CUSTOM_USER_ID, allowing data to be persisted.
             const collectionPath = `artifacts/${appId}/users/${userId}/uploaded_images`;
             const imagesRef = collection(db, collectionPath);
             const q = imagesRef;
 
             loadingStatus.textContent = 'Loading history...';
 
-            // Stop any previous listener
             if (unsubscribeSnapshot) {
                 unsubscribeSnapshot(); 
             }
@@ -316,7 +248,6 @@
                 const uploadedFiles = [];
                 snapshot.forEach((doc) => {
                     const data = doc.data();
-                    // Fallback for timestamp
                     const timestamp = data.timestamp && data.timestamp.seconds 
                         ? new Date(data.timestamp.seconds * 1000).toLocaleString() 
                         : 'N/A';
@@ -338,11 +269,10 @@
 
         async function saveImageToFirestore(name, url) {
             if (!db || !userId) {
-                showMessage('error', 'Database connection not ready. Please log in again.', 'uploader');
+                showMessage('error', 'Database connection not ready.', 'uploader');
                 return;
             }
 
-            // The path ensures data is stored under the fixed custom admin ID
             const collectionPath = `artifacts/${appId}/users/${userId}/uploaded_images`;
             const imagesRef = collection(db, collectionPath);
 
@@ -352,10 +282,9 @@
                     url: url,
                     timestamp: serverTimestamp()
                 });
-                showMessage('success', `Image "${name}" successfully uploaded and saved to history!`, 'uploader');
+                showMessage('success', `Image "${name}" successfully uploaded and saved!`, 'uploader');
             } catch (error) {
                 console.error("Error writing document:", error);
-                // Check if the error is due to large data (Firestore limit is 1MB per document)
                 let errorMessage = error.message.includes('Value for argument "data" is not a valid Firestore document') 
                                  ? 'Upload failed: Data URL size exceeds Firestore document limit (1MB).' 
                                  : `Upload failed: ${error.message}`;
@@ -368,7 +297,7 @@
         function renderImageList(files) {
             loadingStatus.classList.add('hidden');
             if (files.length === 0) {
-                imageListContainer.innerHTML = '<p class="text-gray-500 text-center p-4 bg-gray-700 rounded-lg">No images uploaded yet. Upload your first image!</p>';
+                imageListContainer.innerHTML = '<p class="text-gray-500 text-center p-4 bg-gray-700 rounded-lg">No images uploaded yet. Drag or select your first image!</p>';
                 return;
             }
 
@@ -408,54 +337,7 @@
             imageListContainer.innerHTML = tableHtml;
         }
 
-        // --- Event Listeners (Login) ---
-
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            // Get value from the single input field
-            const inputToken = loginSingleCodeInput.value.trim();
-
-            // Check if the input token is included in the array of valid tokens
-            const isValid = VALID_TOKEN.includes(inputToken);
-
-            loginBtn.disabled = true;
-            loginBtn.textContent = 'Verifying...';
-
-            if (isValid) {
-                userId = CUSTOM_USER_ID;
-                currentUserIdDisplay.textContent = userId;
-                showMessage('success', 'Access granted! Loading upload history.', 'login');
-                
-                // Grant access and load data
-                toggleView(true); // TRANSITIONS TO UPLOADER VIEW
-                loginForm.reset(); // Clears input field for cleanup
-                loadImagesFromFirestore();
-                loginBtn.textContent = 'Access Granted';
-            } else {
-                showMessage('error', 'Invalid access code. Access denied.', 'login');
-                loginBtn.textContent = 'Verify Code';
-                // Small delay before enabling the button again for UX
-                setTimeout(() => { loginBtn.disabled = false; }, 1000);
-            }
-        });
-
-        logoutBtn.addEventListener('click', () => {
-            // Simply clear the session state and return to login view
-            if (unsubscribeSnapshot) {
-                unsubscribeSnapshot(); 
-            }
-            userId = null;
-            selectedFile = null;
-            uploadedImageUrl = null;
-            imageListContainer.innerHTML = '';
-            loadingStatus.textContent = 'Awaiting Token Verification...';
-            toggleView(false);
-            showMessage('info', 'Logged out successfully. Enter codes to re-access.', 'login');
-            loginBtn.textContent = 'Verify Code';
-            loginBtn.disabled = false;
-        });
-
-        // --- Combined Event Listeners (Uploader) ---
+        // --- Event Listeners (Uploader) ---
 
         function handleFile(file) {
             // Firestore documents are limited to 1MB. Data URLs for images are often larger.
@@ -501,7 +383,7 @@
 
         linkButton.addEventListener('click', () => {
             if (!uploadedImageUrl) return;
-            showMessage('info', 'Data URL Generated for Current Selection.', 'uploader', uploadedImageUrl);
+            showMessage('info', 'Data URL Generated for Current Selection. The link is valid for any image saved in history too.', 'uploader', uploadedImageUrl);
         });
 
         // Drag and Drop Logic
@@ -511,7 +393,7 @@
         });
         function preventDefaults (e) { e.preventDefault(); e.stopPropagation(); }
         ['dragenter', 'dragover'].forEach(eventName => { dropZone.addEventListener(eventName, () => dropZone.classList.add('hover'), false); });
-        ['dragleave', 'drop'].forEach(eventName => { dropZone.addEventListener(eventName, () => dropZone.classList.remove('hover'), false); });
+        ['dragleave', 'drop'].forEach(eventName => { dropZone.classList.remove('hover'); }, false);
         dropZone.addEventListener('drop', (e) => { handleFile(e.dataTransfer.files[0]); }, false);
 
         // --- Initialization ---
