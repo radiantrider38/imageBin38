@@ -30,7 +30,7 @@
         <header class="text-center mb-8 border-b border-gray-700 pb-4">
             <h1 class="text-4xl font-extrabold text-indigo-400">Image Gallery</h1>
             <p class="text-gray-400 mt-1">
-                Billing-Free Storage. **Large images will be automatically resized** to fit the Firestore limit ($\approx$1MB).
+                Billing-Free Storage. Public links are now **short URLs** to a dedicated viewer page.
             </p>
         </header>
 
@@ -112,6 +112,7 @@
         import { getFirestore, collection, query, onSnapshot, addDoc, doc, deleteDoc, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Your web app's Firebase configuration
+        // NOTE: These values are placeholders used in the Canvas environment.
         const firebaseConfig = {
             apiKey: "AIzaSyBJELImxh2a5nx85UCHIxHgiD-H-v8LsxE",
             authDomain: "image-uploader-46f04.firebaseapp.com",
@@ -126,10 +127,12 @@
         let db, auth;
         let userId = 'anonymous'; 
         const app = initializeApp(firebaseConfig);
-        // Set the target maximum size slightly below 1MB for safety
         const MAX_FILE_SIZE_BYTES = 950 * 1024; // ~0.95MB
         const MAX_DIMENSION = 1200; // Max width or height in pixels for resizing
         const JPG_QUALITY = 0.8;    // Compression quality for JPG output
+        
+        // IMPORTANT: This constructs the short URL pointing to the viewer.html in the same directory.
+        const VIEWER_BASE_URL = window.location.href.replace('index.html', 'viewer.html').split('?')[0];
 
         // --- DOM ELEMENTS (omitted for brevity) ---
         const authStatusEl = document.getElementById('auth-status');
@@ -161,8 +164,6 @@
         
         /**
          * Reads the file and converts it to a resized/compressed Base64 string if necessary.
-         * @param {File} file - The image file object.
-         * @returns {Promise<string>} - The resized/compressed Base64 data URL.
          */
         function resizeImage(file) {
             return new Promise((resolve, reject) => {
@@ -189,8 +190,6 @@
                         canvas.width = width;
                         canvas.height = height;
                         const ctx = canvas.getContext('2d');
-                        
-                        // Draw the (potentially resized) image onto the canvas
                         ctx.drawImage(img, 0, 0, width, height);
 
                         // Export the canvas content as a compressed JPEG Base64 string
@@ -216,6 +215,7 @@
                 db = getFirestore(app);
                 auth = getAuth(app);
 
+                // Ensure persistence for continuous anonymous sessions
                 await setPersistence(auth, browserLocalPersistence);
 
                 onAuthStateChanged(auth, async (user) => {
@@ -227,6 +227,7 @@
                         startImageListener(userId);
                         uploadButton.disabled = false;
                     } else {
+                        // Sign in anonymously if not already authenticated
                         await signInAnonymously(auth);
                     }
                 });
@@ -292,11 +293,10 @@
                 if (file.size > MAX_FILE_SIZE_BYTES) {
                     showNotification("Processing...", `Large file detected. Resizing and compressing ${file.name} to fit the limit.`);
                     base64Data = await resizeImage(file);
-                    
-                    // The actual byte size of the Base64 data (approx. 3/4 the length of the string)
+                    // Calculate size of the Base64 string data
                     finalFileSize = Math.ceil(base64Data.length * 0.75); 
                 } else {
-                    // Small file: just convert to Base64 without resizing, using original size
+                    // Small file: just convert to Base64
                     const reader = new FileReader();
                     base64Data = await new Promise((resolve, reject) => {
                         reader.onloadend = () => resolve(reader.result);
@@ -344,10 +344,10 @@
                 `Are you sure you want to permanently delete this image?`
             );
             
+            // Reassign the button action to confirm deletion
             modalCloseButton.textContent = "Yes, Delete It";
             modalCloseButton.onclick = async () => {
                 try {
-                    // Delete the metadata/data from Firestore
                     await deleteDoc(doc(db, collectionPath, docId));
                     showNotification("Deleted", "Image successfully removed.");
                 } catch (error) {
@@ -363,16 +363,20 @@
         function renderImageRow(image, currentUserId) {
             const isOwner = image.ownerId === currentUserId;
             const formattedTime = image.timestamp ? new Date(image.timestamp.seconds * 1000).toLocaleString() : 'Loading...';
+            
+            // Construct the short, public URL to the viewer page
+            const shortUrl = `${VIEWER_BASE_URL}?id=${image.id}`;
 
             const row = document.createElement('tr');
             row.className = 'hover:bg-gray-700 transition duration-150';
             row.innerHTML = `
                 <td class="px-6 py-4">
                     <div class="relative h-12 w-12 bg-gray-600 rounded-lg overflow-hidden flex items-center justify-center group">
+                        <!-- Preview image uses the base64 data directly -->
                         <img src="${image.base64Data}" alt="${image.fileName}" class="object-cover w-full h-full transition duration-300 group-hover:opacity-70" loading="lazy">
                         
                         <!-- Link Button on Hover -->
-                        <button data-url="${image.base64Data}" class="copy-link-btn absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-300 bg-black bg-opacity-50 text-white hover:bg-opacity-70 cursor-pointer p-1 rounded-lg">
+                        <button data-url="${shortUrl}" class="copy-link-btn absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-300 bg-black bg-opacity-50 text-white hover:bg-opacity-70 cursor-pointer p-1 rounded-lg">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.881a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
                             </svg>
@@ -388,7 +392,8 @@
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div class="flex flex-col space-y-2">
-                        <a href="${image.base64Data}" target="_blank" class="text-center py-1 text-xs font-semibold rounded-md bg-indigo-600 text-white hover:bg-indigo-700 transition duration-200">
+                        <!-- Use the short URL for viewing -->
+                        <a href="${shortUrl}" target="_blank" class="text-center py-1 text-xs font-semibold rounded-md bg-indigo-600 text-white hover:bg-indigo-700 transition duration-200">
                             View Image
                         </a>
                         ${isOwner ? `
@@ -403,7 +408,7 @@
 
             // Add event listeners for new buttons
             row.querySelector('.copy-link-btn')?.addEventListener('click', (e) => {
-                e.stopPropagation(); // Prevent potentially triggering other actions on the row
+                e.stopPropagation(); 
                 const url = e.currentTarget.getAttribute('data-url');
                 const tempInput = document.createElement('input');
                 tempInput.value = url;
@@ -412,7 +417,7 @@
                 try {
                     document.execCommand('copy');
                     
-                    // Temporary UI feedback on the button itself
+                    // Visual feedback for copying
                     const originalContent = e.currentTarget.innerHTML;
                     e.currentTarget.innerHTML = '<span class="text-xs font-bold">COPIED!</span>';
                     e.currentTarget.classList.add('bg-green-600', 'bg-opacity-100');
@@ -424,7 +429,7 @@
                     }, 1500);
                     
                 } catch (err) {
-                    showNotification("Copy Failed", "Your browser does not support automatic copying. Please manually copy the link from the view tab.");
+                    showNotification("Copy Failed", "Your browser does not support automatic copying. Please view the image and copy the URL from the address bar.");
                 }
                 document.body.removeChild(tempInput);
             });
