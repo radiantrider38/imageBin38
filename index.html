@@ -109,13 +109,28 @@
             setLogLevel('debug'); // Enable Firestore logging
 
             try {
-                // MANDATORY: Access and parse global config variables
-                const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+                // --- MANDATORY: Access and parse global config variables ---
+                const configString = typeof __firebase_config !== 'undefined' ? __firebase_config : '';
+                let firebaseConfig;
+
+                // Check for valid config string before parsing
+                if (!configString.trim()) {
+                    throw new Error("The environment did not provide a valid Firebase configuration string.");
+                }
+
+                try {
+                    firebaseConfig = JSON.parse(configString);
+                } catch (e) {
+                    console.error("Failed to parse Firebase Config:", e);
+                    throw new Error("Invalid Firebase configuration format. Cannot initialize application.");
+                }
+                
                 appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
                 if (Object.keys(firebaseConfig).length === 0) {
-                    throw new Error("Firebase configuration is missing or empty.");
+                    throw new Error("Firebase configuration object is empty.");
                 }
+                // --- END MANDATORY CONFIG PARSING ---
 
                 // Initialize Firebase App and Services
                 const app = initializeApp(firebaseConfig);
@@ -143,9 +158,10 @@
 
             } catch (error) {
                 console.error("Error initializing Firebase or signing in:", error);
-                document.getElementById('user-info').textContent = `Authentication Failed! Check console for errors.`;
+                document.getElementById('user-info').textContent = `Authentication Failed! Cannot start app.`;
                 uploadBtn.disabled = true;
-                showStatus(`Authentication Error: ${error.code || error.message}`, true);
+                // Show a detailed error message on the screen
+                showStatus(`Initialization Error: ${error.message} (Check console for details)`, true);
             }
         }
 
@@ -202,21 +218,6 @@
             }
         }
 
-        function listenForImages() {
-            const q = query(getCollectionRef(), orderBy('createdAt', 'desc'));
-
-            onSnapshot(q, (snapshot) => {
-                const images = [];
-                snapshot.forEach((doc) => {
-                    images.push({ id: doc.id, ...doc.data() });
-                });
-                renderImages(images);
-            }, (error) => {
-                console.error("Error listening to Firestore:", error);
-                showStatus(`Real-time error: ${error.message}. Please check security rules.`, true);
-            });
-        }
-
         function renderImages(images) {
             imageList.innerHTML = ''; // Clear current list
 
@@ -238,7 +239,13 @@
                 img.src = image.imageUrl;
                 img.alt = image.name;
                 img.className = 'w-full h-full object-cover';
-                img.onerror = () => { img.alt = "Failed to load image."; img.className = 'p-4 text-center text-gray-400'; img.src = "https://placehold.co/150x150/e5e7eb/6b7280?text=Load+Error"; };
+                // Fallback for failed image load
+                img.onerror = () => {
+                    img.alt = "Failed to load image.";
+                    img.className = 'p-4 text-center text-gray-400 w-full h-full object-contain';
+                    // Using a responsive placeholder image URL
+                    img.src = `https://placehold.co/400x160/e5e7eb/6b7280?text=Load+Error`;
+                };
                 imgContainer.appendChild(img);
                 imageCard.appendChild(imgContainer);
 
@@ -260,7 +267,7 @@
                 // Format the timestamp if it exists
                 if (image.createdAt && image.createdAt.seconds) {
                     const d = new Date(image.createdAt.seconds * 1000);
-                    date.textContent = d.toLocaleDateString();
+                    date.textContent = d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
                 } else {
                     date.textContent = '...just now';
                 }
@@ -269,6 +276,23 @@
 
                 imageCard.appendChild(content);
                 imageList.appendChild(imageCard);
+            });
+        }
+
+        function listenForImages() {
+            // Sorting by timestamp to show latest first
+            const q = query(getCollectionRef(), orderBy('createdAt', 'desc'));
+
+            onSnapshot(q, (snapshot) => {
+                const images = [];
+                snapshot.forEach((doc) => {
+                    images.push({ id: doc.id, ...doc.data() });
+                });
+                renderImages(images);
+            }, (error) => {
+                console.error("Error listening to Firestore:", error);
+                // Note: The 400 errors from previous attempts were likely due to the Auth config issue.
+                showStatus(`Real-time error: Could not fetch shared data. ${error.message}`, true);
             });
         }
 
