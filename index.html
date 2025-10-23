@@ -1,240 +1,242 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Modern Dark Image Gallery</title>
+    <title>Fixed Image Uploader</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        // Set Tailwind configuration for dark mode and Inter font
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                    colors: {
-                        'primary-bg': '#0f172a', // slate-900
-                        'secondary-bg': '#1e293b', // slate-800
-                        'accent': '#4f46e5', // indigo-600
-                        'accent-light': '#6366f1', // indigo-500
-                    }
-                }
-            }
-        }
-    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Custom styles for the gallery and animations */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-
         body {
             font-family: 'Inter', sans-serif;
+            background-color: #f7f9fc;
         }
-
-        /* Styling for the drag-and-drop area feedback */
-        #drop-zone.dragover {
-            border-color: #6366f1; /* indigo-500 */
-            background-color: #1e293b; /* secondary-bg */
+        #drop-zone {
+            transition: all 0.2s ease-in-out;
+            border-style: dashed;
         }
-        
-        /* Gallery item animation */
-        .gallery-item {
-            transition: transform 0.3s ease-out;
-            max-height: 400px; /* Max height for consistency, but will maintain aspect ratio */
-            overflow: hidden;
-            background-color: #374151; /* gray-700 for loading state */
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.5);
+        #drop-zone.hover {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
         }
-
-        .gallery-item:hover {
-            transform: translateY(-5px);
-        }
-
-        .gallery-item img {
-            display: block;
-            width: 100%; /* Important: Images will take up 100% width of their grid cell */
-            height: auto; /* Preserve aspect ratio */
-            object-fit: contain; /* Ensures the whole image is visible within the container */
+        .btn-upload:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
         }
     </style>
 </head>
-<body class="bg-primary-bg text-gray-100 min-h-screen p-4 md:p-8">
+<body class="min-h-screen p-4 md:p-8 flex items-center justify-center">
 
-    <div class="max-w-7xl mx-auto">
-        
-        <!-- Header -->
-        <header class="mb-10 text-center">
-            <h1 class="text-4xl font-extrabold text-white mb-2">Image Vault Gallery</h1>
-            <p class="text-gray-400">Upload and view your original quality images instantly.</p>
-        </header>
+    <div class="w-full max-w-2xl bg-white shadow-xl rounded-xl p-6 md:p-10 border border-gray-100">
 
-        <!-- Upload Interface -->
-        <div id="drop-zone" class="bg-secondary-bg p-8 rounded-xl shadow-2xl border-2 border-dashed border-gray-600 hover:border-accent-light transition duration-300 mb-12 cursor-pointer text-center" 
-             ondragover="event.preventDefault(); this.classList.add('dragover');" 
-             ondragleave="this.classList.remove('dragover');" 
-             ondrop="handleDrop(event); this.classList.remove('dragover');">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Image Bin & Uploader</h1>
+        <p class="text-gray-500 mb-8 text-center">Select an image or drag-and-drop it below. Preview is instant, and 'Upload' generates a persistent data URL.</p>
 
-            <input type="file" id="fileInput" accept="image/*" multiple class="hidden" onchange="handleFileSelect(this.files)">
-            
-            <div class="flex flex-col items-center space-y-3" onclick="document.getElementById('fileInput').click()">
-                <svg class="w-12 h-12 text-accent-light" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                <p class="text-xl font-semibold text-white">Drag & drop images here</p>
-                <p class="text-sm text-gray-400">or</p>
-                <button type="button" class="px-6 py-2 bg-accent hover:bg-accent-light text-white font-medium rounded-lg transition shadow-lg">
-                    Click to Select Files
-                </button>
-            </div>
-            <p id="error-message" class="text-red-400 mt-4 hidden"></p>
+        <!-- Hidden File Input -->
+        <input type="file" id="file-input" accept="image/*" class="hidden">
+
+        <!-- Drop Zone & File Selection -->
+        <div id="drop-zone" class="p-8 text-center border-2 border-gray-300 rounded-lg cursor-pointer transition duration-300 hover:border-blue-500"
+             onclick="document.getElementById('file-input').click()">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v8"></path></svg>
+            <p class="mt-2 text-sm text-gray-600"><span class="font-semibold text-blue-600">Click to select file</span> or drag and drop</p>
+            <p class="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 10MB</p>
         </div>
 
-        <!-- Gallery Section -->
-        <h2 class="text-3xl font-bold text-white mb-6">Your Image Gallery</h2>
-        
-        <!-- Action Buttons -->
-        <div class="flex justify-end mb-6">
-            <button id="clearGalleryBtn" onclick="clearGallery()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition shadow-md disabled:opacity-50" disabled>
-                Clear Gallery
+        <!-- Preview Container -->
+        <div id="preview-section" class="mt-8 hidden">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">Image Preview</h2>
+            <div id="image-preview-container" class="relative w-full h-64 bg-gray-100 rounded-lg overflow-hidden border border-gray-300">
+                <!-- Image will be inserted here -->
+            </div>
+            <p id="file-name" class="text-sm text-gray-600 mt-2 font-medium"></p>
+        </div>
+
+        <!-- Action Button -->
+        <div class="mt-6 flex justify-center">
+            <button id="upload-button" class="btn-upload px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition duration-150 ease-in-out disabled:opacity-50" disabled>
+                Simulate Upload & Generate Link
             </button>
         </div>
 
-        <div id="galleryContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            <!-- Images will be inserted here by JavaScript -->
-            <p id="placeholderText" class="col-span-full text-center text-gray-500 p-10 bg-secondary-bg rounded-lg">Upload an image to get started.</p>
+        <!-- Status Message Box -->
+        <div id="message-box" class="mt-8 p-4 rounded-lg border-l-4 border-gray-400 bg-gray-50 text-gray-700 hidden">
+            <!-- Messages appear here -->
         </div>
 
     </div>
 
     <script>
-        const galleryContainer = document.getElementById('galleryContainer');
-        const placeholderText = document.getElementById('placeholderText');
-        const clearGalleryBtn = document.getElementById('clearGalleryBtn');
-        const errorMessage = document.getElementById('error-message');
-        const fileInput = document.getElementById('fileInput');
+        const fileInput = document.getElementById('file-input');
+        const dropZone = document.getElementById('drop-zone');
+        const previewSection = document.getElementById('preview-section');
+        const previewContainer = document.getElementById('image-preview-container');
+        const fileNameDisplay = document.getElementById('file-name');
+        const uploadButton = document.getElementById('upload-button');
+        const messageBox = document.getElementById('message-box');
 
-        // Global array to store object URLs for later cleanup
-        let uploadedImages = [];
+        let selectedFile = null;
+        let uploadedImageUrl = null;
 
-        /**
-         * Converts file data into image elements and adds them to the gallery.
-         * @param {FileList} files - The list of files to process.
-         */
-        function handleFileSelect(files) {
-            errorMessage.classList.add('hidden'); // Clear previous errors
-            if (files.length === 0) return;
+        // --- Utility Functions ---
 
-            // Hide the placeholder text
-            if (placeholderText) {
-                placeholderText.classList.add('hidden');
+        /** Displays a message in the status box. */
+        function showMessage(type, message, link = null) {
+            let color, icon;
+            switch(type) {
+                case 'error':
+                    color = 'border-red-500 bg-red-50 text-red-700';
+                    icon = `<svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>`;
+                    break;
+                case 'success':
+                    color = 'border-green-500 bg-green-50 text-green-700';
+                    icon = `<svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>`;
+                    break;
+                case 'loading':
+                    color = 'border-yellow-500 bg-yellow-50 text-yellow-700';
+                    icon = `<svg class="animate-spin w-5 h-5 mr-2 text-yellow-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+                    break;
+                default:
+                    color = 'border-gray-400 bg-gray-50 text-gray-700';
+                    icon = `<svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>`;
             }
-            
-            Array.from(files).forEach(file => {
-                if (file.type.startsWith('image/')) {
-                    const objectURL = URL.createObjectURL(file);
-                    uploadedImages.push(objectURL);
-                    createImageElement(objectURL, file.name);
-                } else {
-                    // Display an error message for non-image files
-                    errorMessage.textContent = `Error: File "${file.name}" is not a supported image type.`;
-                    errorMessage.classList.remove('hidden');
-                }
-            });
 
-            // Enable clear button if there are images
-            clearGalleryBtn.disabled = uploadedImages.length === 0;
-            fileInput.value = ''; // Reset file input so same file can be uploaded again
+            let linkHtml = link ? `<a href="${link}" target="_blank" class="text-blue-600 underline hover:text-blue-800 break-all mt-2 block">View Data URL Image (Click to copy)</a>` : '';
+
+            messageBox.className = `mt-8 p-4 rounded-lg border-l-4 ${color} flex items-start hidden`;
+            messageBox.innerHTML = `
+                <div class="flex items-center">
+                    ${icon}
+                    <p class="font-medium">${message}</p>
+                </div>
+                ${linkHtml}
+            `;
+            messageBox.classList.remove('hidden');
+
+            // Add copy functionality for the link
+            if (link) {
+                const linkElement = messageBox.querySelector('a');
+                linkElement.onclick = (e) => {
+                    e.preventDefault();
+                    // Using document.execCommand('copy') for better compatibility in iFrames/sandbox environments
+                    const el = document.createElement('textarea');
+                    el.value = link;
+                    document.body.appendChild(el);
+                    el.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(el);
+                    showMessage('success', 'Image Data URL copied to clipboard!', link);
+                };
+            }
         }
 
-        /**
-         * Handles the drop event for drag-and-drop.
-         * @param {DragEvent} event - The drop event.
-         */
-        function handleDrop(event) {
-            event.preventDefault();
-            event.currentTarget.classList.remove('dragover');
-            
-            const items = event.dataTransfer.items;
-            const files = [];
-
-            // Iterate through data transfer items to get files
-            for (let i = 0; i < items.length; i++) {
-                const item = items[i];
-                if (item.kind === 'file') {
-                    files.push(item.getAsFile());
-                }
+        /** Handles file selection and generates the preview. */
+        function handleFile(file) {
+            if (!file || !file.type.startsWith('image/')) {
+                showMessage('error', 'Invalid file type. Please select an image (JPG, PNG, GIF).');
+                selectedFile = null;
+                uploadButton.disabled = true;
+                previewSection.classList.add('hidden');
+                return;
             }
 
-            if (files.length > 0) {
-                handleFileSelect(files);
+            if (file.size > 10 * 1024 * 1024) { // 10MB limit
+                showMessage('error', 'File size exceeds the 10MB limit.');
+                selectedFile = null;
+                uploadButton.disabled = true;
+                previewSection.classList.add('hidden');
+                return;
             }
-        }
 
-        /**
-         * Creates and appends an image element to the gallery.
-         * @param {string} src - The object URL for the image.
-         * @param {string} name - The original file name.
-         */
-        function createImageElement(src, name) {
-            const container = document.createElement('div');
-            container.className = 'gallery-item rounded-xl overflow-hidden';
+            selectedFile = file;
+            fileNameDisplay.textContent = `Selected: ${file.name}`;
+            uploadButton.disabled = false;
 
-            const img = new Image();
-            img.src = src;
-            img.alt = `Uploaded image: ${name}`;
-            img.loading = 'lazy';
-            
-            // This is key: we want to read the image's original dimensions 
-            // and display them accurately (while still being responsive).
-            img.onload = function() {
-                // To display the "real size," we let the image determine its height (h-auto)
-                // and constrain its width to the container (w-full).
-                // The grid layout manages the overall flow.
-                const imgWidth = img.naturalWidth;
-                const imgHeight = img.naturalHeight;
-                
-                const metadata = document.createElement('div');
-                metadata.className = 'p-3 bg-secondary-bg/70 backdrop-blur-sm text-xs text-gray-400 truncate';
-                metadata.innerHTML = `
-                    <span class="font-semibold text-white">${name}</span><br>
-                    ${imgWidth}px x ${imgHeight}px
-                `;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const imageUrl = e.target.result;
+                uploadedImageUrl = imageUrl;
 
-                container.appendChild(img);
-                container.appendChild(metadata);
+                // Update preview
+                previewContainer.innerHTML = `<img src="${imageUrl}" alt="Image Preview" class="w-full h-full object-contain">`;
+                previewSection.classList.remove('hidden');
+
+                // Clear previous success message
+                messageBox.classList.add('hidden');
             };
-
-            galleryContainer.appendChild(container);
+            reader.readAsDataURL(file);
         }
 
-        /**
-         * Clears all images from the gallery and releases memory.
-         */
-        function clearGallery() {
-            // Revoke all created object URLs to free up memory
-            uploadedImages.forEach(url => URL.revokeObjectURL(url));
-            uploadedImages = [];
+        // --- Event Handlers ---
 
-            // Clear the DOM elements
-            galleryContainer.innerHTML = '';
-            galleryContainer.appendChild(placeholderText);
-            placeholderText.classList.remove('hidden');
-
-            // Disable the clear button
-            clearGalleryBtn.disabled = true;
-            errorMessage.classList.add('hidden'); 
-        }
-
-        // Set up global drag-and-drop prevention for the window to allow drops only on the zone
-        window.addEventListener('dragover', (e) => e.preventDefault());
-        window.addEventListener('drop', (e) => {
-            // Only prevent default if files are being dropped outside the target zone
-            const dropZone = document.getElementById('drop-zone');
-            if (e.target !== dropZone && !dropZone.contains(e.target)) {
-                 e.preventDefault();
-            }
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            handleFile(file);
         });
 
+        uploadButton.addEventListener('click', () => {
+            if (!uploadedImageUrl) {
+                showMessage('error', 'No image selected to upload.');
+                return;
+            }
+
+            uploadButton.disabled = true;
+            showMessage('loading', 'Uploading image...');
+
+            // Simulate network latency (2 seconds)
+            setTimeout(() => {
+                uploadButton.disabled = false;
+                // Since there is no backend, the "uploaded" image is the Data URL itself.
+                showMessage('success', 'Upload Simulated! Your image is now available as a Data URL:', uploadedImageUrl);
+            }, 2000);
+        });
+
+
+        // --- Drag and Drop Logic ---
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            dropZone.classList.add('hover');
+        }
+
+        function unhighlight(e) {
+            dropZone.classList.remove('hover');
+        }
+
+        dropZone.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+
+            // Only process the first file if multiple were dropped
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }
+
+        // Initial state message
+        showMessage('info', 'Ready to accept an image file.');
+
     </script>
+
 </body>
 </html>
