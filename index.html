@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Dark Image Gallery</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Set Tailwind configuration for dark mode and Inter font
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'primary-bg': '#0f172a', // slate-900
+                        'secondary-bg': '#1e293b', // slate-800
+                        'accent': '#4f46e5', // indigo-600
+                        'accent-light': '#6366f1', // indigo-500
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom styles for the gallery and animations */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Styling for the drag-and-drop area feedback */
+        #drop-zone.dragover {
+            border-color: #6366f1; /* indigo-500 */
+            background-color: #1e293b; /* secondary-bg */
+        }
+        
+        /* Gallery item animation */
+        .gallery-item {
+            transition: transform 0.3s ease-out;
+            max-height: 400px; /* Max height for consistency, but will maintain aspect ratio */
+            overflow: hidden;
+            background-color: #374151; /* gray-700 for loading state */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.5);
+        }
+
+        .gallery-item:hover {
+            transform: translateY(-5px);
+        }
+
+        .gallery-item img {
+            display: block;
+            width: 100%; /* Important: Images will take up 100% width of their grid cell */
+            height: auto; /* Preserve aspect ratio */
+            object-fit: contain; /* Ensures the whole image is visible within the container */
+        }
+    </style>
+</head>
+<body class="bg-primary-bg text-gray-100 min-h-screen p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        
+        <!-- Header -->
+        <header class="mb-10 text-center">
+            <h1 class="text-4xl font-extrabold text-white mb-2">Image Vault Gallery</h1>
+            <p class="text-gray-400">Upload and view your original quality images instantly.</p>
+        </header>
+
+        <!-- Upload Interface -->
+        <div id="drop-zone" class="bg-secondary-bg p-8 rounded-xl shadow-2xl border-2 border-dashed border-gray-600 hover:border-accent-light transition duration-300 mb-12 cursor-pointer text-center" 
+             ondragover="event.preventDefault(); this.classList.add('dragover');" 
+             ondragleave="this.classList.remove('dragover');" 
+             ondrop="handleDrop(event); this.classList.remove('dragover');">
+
+            <input type="file" id="fileInput" accept="image/*" multiple class="hidden" onchange="handleFileSelect(this.files)">
+            
+            <div class="flex flex-col items-center space-y-3" onclick="document.getElementById('fileInput').click()">
+                <svg class="w-12 h-12 text-accent-light" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                <p class="text-xl font-semibold text-white">Drag & drop images here</p>
+                <p class="text-sm text-gray-400">or</p>
+                <button type="button" class="px-6 py-2 bg-accent hover:bg-accent-light text-white font-medium rounded-lg transition shadow-lg">
+                    Click to Select Files
+                </button>
+            </div>
+            <p id="error-message" class="text-red-400 mt-4 hidden"></p>
+        </div>
+
+        <!-- Gallery Section -->
+        <h2 class="text-3xl font-bold text-white mb-6">Your Image Gallery</h2>
+        
+        <!-- Action Buttons -->
+        <div class="flex justify-end mb-6">
+            <button id="clearGalleryBtn" onclick="clearGallery()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition shadow-md disabled:opacity-50" disabled>
+                Clear Gallery
+            </button>
+        </div>
+
+        <div id="galleryContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <!-- Images will be inserted here by JavaScript -->
+            <p id="placeholderText" class="col-span-full text-center text-gray-500 p-10 bg-secondary-bg rounded-lg">Upload an image to get started.</p>
+        </div>
+
+    </div>
+
+    <script>
+        const galleryContainer = document.getElementById('galleryContainer');
+        const placeholderText = document.getElementById('placeholderText');
+        const clearGalleryBtn = document.getElementById('clearGalleryBtn');
+        const errorMessage = document.getElementById('error-message');
+        const fileInput = document.getElementById('fileInput');
+
+        // Global array to store object URLs for later cleanup
+        let uploadedImages = [];
+
+        /**
+         * Converts file data into image elements and adds them to the gallery.
+         * @param {FileList} files - The list of files to process.
+         */
+        function handleFileSelect(files) {
+            errorMessage.classList.add('hidden'); // Clear previous errors
+            if (files.length === 0) return;
+
+            // Hide the placeholder text
+            if (placeholderText) {
+                placeholderText.classList.add('hidden');
+            }
+            
+            Array.from(files).forEach(file => {
+                if (file.type.startsWith('image/')) {
+                    const objectURL = URL.createObjectURL(file);
+                    uploadedImages.push(objectURL);
+                    createImageElement(objectURL, file.name);
+                } else {
+                    // Display an error message for non-image files
+                    errorMessage.textContent = `Error: File "${file.name}" is not a supported image type.`;
+                    errorMessage.classList.remove('hidden');
+                }
+            });
+
+            // Enable clear button if there are images
+            clearGalleryBtn.disabled = uploadedImages.length === 0;
+            fileInput.value = ''; // Reset file input so same file can be uploaded again
+        }
+
+        /**
+         * Handles the drop event for drag-and-drop.
+         * @param {DragEvent} event - The drop event.
+         */
+        function handleDrop(event) {
+            event.preventDefault();
+            event.currentTarget.classList.remove('dragover');
+            
+            const items = event.dataTransfer.items;
+            const files = [];
+
+            // Iterate through data transfer items to get files
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                if (item.kind === 'file') {
+                    files.push(item.getAsFile());
+                }
+            }
+
+            if (files.length > 0) {
+                handleFileSelect(files);
+            }
+        }
+
+        /**
+         * Creates and appends an image element to the gallery.
+         * @param {string} src - The object URL for the image.
+         * @param {string} name - The original file name.
+         */
+        function createImageElement(src, name) {
+            const container = document.createElement('div');
+            container.className = 'gallery-item rounded-xl overflow-hidden';
+
+            const img = new Image();
+            img.src = src;
+            img.alt = `Uploaded image: ${name}`;
+            img.loading = 'lazy';
+            
+            // This is key: we want to read the image's original dimensions 
+            // and display them accurately (while still being responsive).
+            img.onload = function() {
+                // To display the "real size," we let the image determine its height (h-auto)
+                // and constrain its width to the container (w-full).
+                // The grid layout manages the overall flow.
+                const imgWidth = img.naturalWidth;
+                const imgHeight = img.naturalHeight;
+                
+                const metadata = document.createElement('div');
+                metadata.className = 'p-3 bg-secondary-bg/70 backdrop-blur-sm text-xs text-gray-400 truncate';
+                metadata.innerHTML = `
+                    <span class="font-semibold text-white">${name}</span><br>
+                    ${imgWidth}px x ${imgHeight}px
+                `;
+
+                container.appendChild(img);
+                container.appendChild(metadata);
+            };
+
+            galleryContainer.appendChild(container);
+        }
+
+        /**
+         * Clears all images from the gallery and releases memory.
+         */
+        function clearGallery() {
+            // Revoke all created object URLs to free up memory
+            uploadedImages.forEach(url => URL.revokeObjectURL(url));
+            uploadedImages = [];
+
+            // Clear the DOM elements
+            galleryContainer.innerHTML = '';
+            galleryContainer.appendChild(placeholderText);
+            placeholderText.classList.remove('hidden');
+
+            // Disable the clear button
+            clearGalleryBtn.disabled = true;
+            errorMessage.classList.add('hidden'); 
+        }
+
+        // Set up global drag-and-drop prevention for the window to allow drops only on the zone
+        window.addEventListener('dragover', (e) => e.preventDefault());
+        window.addEventListener('drop', (e) => {
+            // Only prevent default if files are being dropped outside the target zone
+            const dropZone = document.getElementById('drop-zone');
+            if (e.target !== dropZone && !dropZone.contains(e.target)) {
+                 e.preventDefault();
+            }
+        });
+
+    </script>
+</body>
+</html>
