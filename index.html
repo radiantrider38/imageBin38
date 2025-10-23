@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Image Bin | Upload & Share</title>
+    <title>Image Gallery</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Use Inter Font -->
@@ -20,10 +20,6 @@
         ::-webkit-scrollbar-track { background-color: #2a2a2a; }
         .card-shadow { box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5); }
         .hover-lift:hover { transform: translateY(-3px); box-shadow: 0 6px 12px rgba(0, 0, 0, 0.7); }
-        /* Sticky header for scrollable table on small screens */
-        .min-w-full th {
-            white-space: nowrap;
-        }
     </style>
 </head>
 
@@ -32,8 +28,10 @@
 
         <!-- Header -->
         <header class="text-center mb-8 border-b border-gray-700 pb-4">
-            <h1 class="text-4xl font-extrabold text-indigo-400">Secure Image Bin</h1>
-            <p class="text-gray-400 mt-1">Permanent Storage & Sharable Links for Large Files</p>
+            <h1 class="text-4xl font-extrabold text-indigo-400">Image Gallery</h1>
+            <p class="text-gray-400 mt-1">
+                Billing-Free Storage. **Large images will be automatically resized** to fit the Firestore limit ($\approx$1MB).
+            </p>
         </header>
 
         <!-- Upload Interface -->
@@ -48,7 +46,7 @@
                 hover:file:bg-indigo-700 cursor-pointer mb-4">
             
             <button id="upload-button" class="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl transition duration-200 hover:bg-indigo-700 hover-lift disabled:bg-indigo-400">
-                Upload & Generate Link
+                Upload & Store Data
             </button>
 
             <div id="loading-spinner" class="hidden text-center mt-4">
@@ -56,7 +54,7 @@
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <span class="text-gray-400">Uploading file... Please wait.</span>
+                <span class="text-gray-400">Processing file... Please wait (resizing if necessary).</span>
             </div>
             <p id="auth-status" class="text-center text-sm mt-4 text-red-400 font-medium"></p>
         </div>
@@ -74,7 +72,7 @@
                                 Preview
                             </th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                                File Name / ID
+                                File Name
                             </th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider hidden sm:table-cell">
                                 Timestamp
@@ -109,38 +107,37 @@
 
     <script type="module">
         // --- FIREBASE CONFIGURATION ---
-        // 1. Core Firebase SDKs
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, query, onSnapshot, addDoc, doc, deleteDoc, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        // 2. Firebase Storage SDK (Critical for large files)
-        import { getStorage, ref, uploadBytes, deleteObject, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
-        // Your web app's Firebase configuration (Provided by user)
+        // Your web app's Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyBJELImxh2a5nx85UCHIxHgiD-H-v8LsxE",
             authDomain: "image-uploader-46f04.firebaseapp.com",
             projectId: "image-uploader-46f04",
-            storageBucket: "image-uploader-46f04.firebasestorage.app",
+            storageBucket: "image-uploader-46f04.firebasestorage.app", 
             messagingSenderId: "1046392282951",
             appId: "1:1046392282951:web:ca8e9e14d6281f03bef662",
             measurementId: "G-WX74X0NEGK"
         };
 
-        // --- GLOBAL VARIABLES ---
-        let db, auth, storage;
-        let userId = 'anonymous'; // Default until authenticated
+        // --- GLOBAL VARIABLES & CONSTANTS ---
+        let db, auth;
+        let userId = 'anonymous'; 
         const app = initializeApp(firebaseConfig);
+        // Set the target maximum size slightly below 1MB for safety
+        const MAX_FILE_SIZE_BYTES = 950 * 1024; // ~0.95MB
+        const MAX_DIMENSION = 1200; // Max width or height in pixels for resizing
+        const JPG_QUALITY = 0.8;    // Compression quality for JPG output
 
-        // --- DOM ELEMENTS ---
+        // --- DOM ELEMENTS (omitted for brevity) ---
         const authStatusEl = document.getElementById('auth-status');
         const uploadButton = document.getElementById('upload-button');
         const imageFileEl = document.getElementById('image-file');
         const tableBodyEl = document.getElementById('image-table-body');
         const loadingSpinnerEl = document.getElementById('loading-spinner');
         const noImagesMessageEl = document.getElementById('no-images-message');
-        
-        // Modal elements
         const modalEl = document.getElementById('notification-modal');
         const modalTitleEl = document.getElementById('modal-title');
         const modalMessageEl = document.getElementById('modal-message');
@@ -154,13 +151,62 @@
             modalEl.classList.remove('hidden');
             modalEl.classList.add('flex', 'opacity-0');
             setTimeout(() => modalEl.classList.remove('opacity-0'), 10);
-            // Ensure the button handler is reset to "Close" on display
             modalCloseButton.textContent = "Close";
             modalCloseButton.onclick = () => {
                 modalEl.classList.add('opacity-0');
                 setTimeout(() => modalEl.classList.remove('flex'), 300);
                 setTimeout(() => modalEl.classList.add('hidden'), 300);
             };
+        }
+        
+        /**
+         * Reads the file and converts it to a resized/compressed Base64 string if necessary.
+         * @param {File} file - The image file object.
+         * @returns {Promise<string>} - The resized/compressed Base64 data URL.
+         */
+        function resizeImage(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onerror = reject;
+                reader.onload = (readerEvent) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        let width = img.width;
+                        let height = img.height;
+
+                        // Check if resizing is necessary (either dimension is too large)
+                        if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+                            if (width > height) {
+                                height = Math.round(height * (MAX_DIMENSION / width));
+                                width = MAX_DIMENSION;
+                            } else {
+                                width = Math.round(width * (MAX_DIMENSION / height));
+                                height = MAX_DIMENSION;
+                            }
+                        }
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        
+                        // Draw the (potentially resized) image onto the canvas
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        // Export the canvas content as a compressed JPEG Base64 string
+                        const compressedDataUrl = canvas.toDataURL('image/jpeg', JPG_QUALITY);
+                        
+                        // Fallback check: if the compressed image is STILL too large, reject (unlikely)
+                        if (compressedDataUrl.length > (MAX_FILE_SIZE_BYTES * 4/3)) { // Base64 is about 33% larger than binary data
+                             reject(new Error("Resized image still exceeds safe size limit."));
+                        }
+
+                        resolve(compressedDataUrl);
+                    };
+                    img.src = readerEvent.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
         }
 
         // --- FIREBASE INITIALIZATION & AUTH ---
@@ -169,7 +215,6 @@
             try {
                 db = getFirestore(app);
                 auth = getAuth(app);
-                storage = getStorage(app); 
 
                 await setPersistence(auth, browserLocalPersistence);
 
@@ -182,7 +227,6 @@
                         startImageListener(userId);
                         uploadButton.disabled = false;
                     } else {
-                        // Attempt permanent anonymous sign-in
                         await signInAnonymously(auth);
                     }
                 });
@@ -225,7 +269,7 @@
             });
         }
         
-        // --- UPLOAD AND DELETE LOGIC ---
+        // --- UPLOAD AND DELETE LOGIC (FIRESTORE ONLY) ---
 
         async function uploadImage() {
             const file = imageFileEl.files[0];
@@ -233,46 +277,63 @@
                 showNotification("Missing File", "Please select an image file to upload.");
                 return;
             }
+            if (!file.type.startsWith('image/')) {
+                 showNotification("Invalid File", "Please select a valid image file.");
+                return;
+            }
 
             loadingSpinnerEl.classList.remove('hidden');
             uploadButton.disabled = true;
-
-            const fileExtension = file.name.split('.').pop();
-            const fileName = `${crypto.randomUUID()}.${fileExtension}`;
-            let publicUrl = '';
+            let base64Data;
+            let finalFileSize;
 
             try {
-                // 1. Upload file to Firebase Storage
-                const storageRef = ref(storage, `images/${fileName}`);
-                const snapshot = await uploadBytes(storageRef, file);
+                // Determine if we need to resize based on original size
+                if (file.size > MAX_FILE_SIZE_BYTES) {
+                    showNotification("Processing...", `Large file detected. Resizing and compressing ${file.name} to fit the limit.`);
+                    base64Data = await resizeImage(file);
+                    
+                    // The actual byte size of the Base64 data (approx. 3/4 the length of the string)
+                    finalFileSize = Math.ceil(base64Data.length * 0.75); 
+                } else {
+                    // Small file: just convert to Base64 without resizing, using original size
+                    const reader = new FileReader();
+                    base64Data = await new Promise((resolve, reject) => {
+                        reader.onloadend = () => resolve(reader.result);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file);
+                    });
+                    finalFileSize = file.size; 
+                }
                 
-                // 2. Get the permanent download URL
-                publicUrl = await getDownloadURL(snapshot.ref);
+                // Final safety check after processing
+                if (finalFileSize > MAX_FILE_SIZE_BYTES) {
+                     throw new Error(`Final processed size (${(finalFileSize / 1024).toFixed(2)} KB) still exceeds limit.`);
+                }
 
-                // 3. Save metadata to Firestore
+                // Save Base64 data and metadata to Firestore
                 await addDoc(collection(db, collectionPath), {
-                    fileName: fileName,
-                    originalName: file.name,
-                    publicUrl: publicUrl, 
+                    fileName: file.name,
+                    base64Data: base64Data, 
                     timestamp: serverTimestamp(),
                     ownerId: userId,
                     mimeType: file.type,
-                    size: file.size,
+                    size: finalFileSize,
                 });
 
-                showNotification("Success!", `Image "${file.name}" uploaded and link generated.`);
+                showNotification("Success!", `Image "${file.name}" uploaded successfully. Final size: ${(finalFileSize / 1024).toFixed(2)} KB.`);
                 imageFileEl.value = '';
 
             } catch (error) {
                 console.error("Upload Error:", error);
-                showNotification("Upload Failed", `Could not upload image. Error: ${error.message}. Check Storage rules.`);
+                showNotification("Upload Failed", `Could not upload image. Error: ${error.message}.`);
             } finally {
                 loadingSpinnerEl.classList.add('hidden');
                 uploadButton.disabled = false;
             }
         }
 
-        function deleteImage(docId, storageFileName, ownerId) {
+        async function deleteImage(docId, ownerId) {
             if (userId !== ownerId) {
                 showNotification("Permission Denied", "You can only delete images you uploaded.");
                 return;
@@ -280,34 +341,20 @@
             
             showNotification(
                 "Confirm Deletion", 
-                `Are you sure you want to permanently delete "${storageFileName}"?`
+                `Are you sure you want to permanently delete this image?`
             );
             
-            // Re-purpose the modal button for confirmation
             modalCloseButton.textContent = "Yes, Delete It";
-            modalCloseButton.onclick = () => {
-                performDeletion(docId, storageFileName);
-                // The modal will close automatically inside performDeletion or stay open on error
+            modalCloseButton.onclick = async () => {
+                try {
+                    // Delete the metadata/data from Firestore
+                    await deleteDoc(doc(db, collectionPath, docId));
+                    showNotification("Deleted", "Image successfully removed.");
+                } catch (error) {
+                    console.error("Deletion Error:", error);
+                    showNotification("Deletion Failed", `Could not delete file. Error: ${error.message}.`);
+                }
             };
-        }
-
-        async function performDeletion(docId, storageFileName) {
-            try {
-                // 1. Delete from Firebase Storage
-                const storageRef = ref(storage, `images/${storageFileName}`);
-                await deleteObject(storageRef);
-                
-                // 2. Delete the metadata from Firestore
-                await deleteDoc(doc(db, collectionPath, docId));
-
-                showNotification("Deleted", "Image successfully removed.");
-            } catch (error) {
-                console.error("Deletion Error:", error);
-                showNotification("Deletion Failed", `Could not delete file. Error: ${error.message}.`);
-            } finally {
-                // Ensure the modal button is reset after the operation
-                modalCloseButton.textContent = "Close"; 
-            }
         }
 
 
@@ -320,28 +367,32 @@
             const row = document.createElement('tr');
             row.className = 'hover:bg-gray-700 transition duration-150';
             row.innerHTML = `
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="h-10 w-10 bg-gray-600 rounded-lg overflow-hidden flex items-center justify-center">
-                        <img src="${image.publicUrl}" alt="${image.originalName}" class="object-cover w-full h-full" loading="lazy">
+                <td class="px-6 py-4">
+                    <div class="relative h-12 w-12 bg-gray-600 rounded-lg overflow-hidden flex items-center justify-center group">
+                        <img src="${image.base64Data}" alt="${image.fileName}" class="object-cover w-full h-full transition duration-300 group-hover:opacity-70" loading="lazy">
+                        
+                        <!-- Link Button on Hover -->
+                        <button data-url="${image.base64Data}" class="copy-link-btn absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-300 bg-black bg-opacity-50 text-white hover:bg-opacity-70 cursor-pointer p-1 rounded-lg">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.881a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                            </svg>
+                        </button>
                     </div>
                 </td>
                 <td class="px-6 py-4">
-                    <p class="text-sm font-medium text-white truncate" title="${image.originalName}">${image.originalName}</p>
-                    <p class="text-xs text-gray-400 truncate hidden sm:block">ID: ${image.id.substring(0, 12)}...</p>
+                    <p class="text-sm font-medium text-white truncate" title="${image.fileName}">${image.fileName}</p>
+                    <p class="text-xs text-gray-400 truncate hidden sm:block">Size: ${(image.size / 1024).toFixed(2)} KB</p>
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-400 hidden sm:table-cell">
                     ${formattedTime}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div class="flex flex-col space-y-2">
-                        <a href="${image.publicUrl}" target="_blank" class="text-center py-1 text-xs font-semibold rounded-md bg-indigo-600 text-white hover:bg-indigo-700 transition duration-200">
+                        <a href="${image.base64Data}" target="_blank" class="text-center py-1 text-xs font-semibold rounded-md bg-indigo-600 text-white hover:bg-indigo-700 transition duration-200">
                             View Image
                         </a>
-                        <button data-url="${image.publicUrl}" class="copy-link-btn text-center py-1 text-xs font-semibold rounded-md bg-gray-600 text-gray-200 hover:bg-gray-500 transition duration-200">
-                            Get Link
-                        </button>
                         ${isOwner ? `
-                            <button data-id="${image.id}" data-filename="${image.fileName}" data-owner="${image.ownerId}" class="delete-btn text-center py-1 text-xs font-semibold rounded-md bg-red-600 text-white hover:bg-red-700 transition duration-200">
+                            <button data-id="${image.id}" data-owner="${image.ownerId}" class="delete-btn text-center py-1 text-xs font-semibold rounded-md bg-red-600 text-white hover:bg-red-700 transition duration-200">
                                 Delete
                             </button>
                         ` : ''}
@@ -352,6 +403,7 @@
 
             // Add event listeners for new buttons
             row.querySelector('.copy-link-btn')?.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent potentially triggering other actions on the row
                 const url = e.currentTarget.getAttribute('data-url');
                 const tempInput = document.createElement('input');
                 tempInput.value = url;
@@ -359,8 +411,18 @@
                 tempInput.select();
                 try {
                     document.execCommand('copy');
-                    e.currentTarget.textContent = 'Copied!';
-                    setTimeout(() => e.currentTarget.textContent = 'Get Link', 2000);
+                    
+                    // Temporary UI feedback on the button itself
+                    const originalContent = e.currentTarget.innerHTML;
+                    e.currentTarget.innerHTML = '<span class="text-xs font-bold">COPIED!</span>';
+                    e.currentTarget.classList.add('bg-green-600', 'bg-opacity-100');
+                    e.currentTarget.classList.remove('bg-black', 'bg-opacity-50');
+                    setTimeout(() => {
+                        e.currentTarget.innerHTML = originalContent;
+                        e.currentTarget.classList.remove('bg-green-600', 'bg-opacity-100');
+                        e.currentTarget.classList.add('bg-black', 'bg-opacity-50');
+                    }, 1500);
+                    
                 } catch (err) {
                     showNotification("Copy Failed", "Your browser does not support automatic copying. Please manually copy the link from the view tab.");
                 }
@@ -369,9 +431,8 @@
 
             row.querySelector('.delete-btn')?.addEventListener('click', (e) => {
                 const docId = e.currentTarget.getAttribute('data-id');
-                const fileName = e.currentTarget.getAttribute('data-filename');
                 const owner = e.currentTarget.getAttribute('data-owner');
-                deleteImage(docId, fileName, owner);
+                deleteImage(docId, owner);
             });
         }
 
