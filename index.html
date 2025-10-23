@@ -3,334 +3,381 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Collaborative Image Bin</title>
+    <title>Secure Image Bin | Upload & Share</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Use Inter font -->
+    <!-- Use Inter Font -->
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f7f7f7;
+            background-color: #1a1a1a;
+            color: #e5e5e5;
         }
-        /* Custom scrollbar for image list */
-        #image-list::-webkit-scrollbar {
-            width: 8px;
-        }
-        #image-list::-webkit-scrollbar-thumb {
-            background-color: #3b82f6;
-            border-radius: 4px;
+        /* Custom scrollbar for dark theme */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-thumb { background-color: #4a4a4a; border-radius: 4px; }
+        ::-webkit-scrollbar-track { background-color: #2a2a2a; }
+        .card-shadow { box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5); }
+        .hover-lift:hover { transform: translateY(-3px); box-shadow: 0 6px 12px rgba(0, 0, 0, 0.7); }
+        /* Sticky header for scrollable table on small screens */
+        .min-w-full th {
+            white-space: nowrap;
         }
     </style>
 </head>
-<body class="min-h-screen p-4 md:p-8">
 
-    <div id="app" class="max-w-4xl mx-auto bg-white shadow-xl rounded-xl p-6 md:p-8">
-        <h1 class="text-3xl font-bold text-gray-800 mb-2 flex items-center">
-            🖼️ Collaborative Image Bin
-        </h1>
-        <p class="text-sm text-blue-600 mb-6 font-medium" id="user-info">
-            Loading user...
-        </p>
+<body class="min-h-screen p-4 sm:p-8">
+    <div id="app" class="max-w-6xl mx-auto">
 
-        <!-- Loading Indicator and Error Message -->
-        <div id="status-message" class="mb-4 text-center py-2 text-sm font-semibold text-white rounded-lg hidden"></div>
+        <!-- Header -->
+        <header class="text-center mb-8 border-b border-gray-700 pb-4">
+            <h1 class="text-4xl font-extrabold text-indigo-400">Secure Image Bin</h1>
+            <p class="text-gray-400 mt-1">Permanent Storage & Sharable Links for Large Files</p>
+        </header>
 
-        <!-- Image Upload Section -->
-        <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50 mb-8">
-            <label for="image-upload" class="block text-lg font-medium text-gray-700 mb-3">Upload a Photo</label>
-            <input type="file" id="image-upload" accept="image/*" class="w-full text-sm text-gray-500
+        <!-- Upload Interface -->
+        <div id="upload-card" class="bg-gray-800 p-6 rounded-xl card-shadow mb-12">
+            <h2 class="text-2xl font-semibold mb-4 text-white">Upload Image</h2>
+            
+            <input type="file" id="image-file" accept="image/*" class="w-full text-sm text-gray-300
                 file:mr-4 file:py-2 file:px-4
                 file:rounded-full file:border-0
                 file:text-sm file:font-semibold
-                file:bg-blue-50 file:text-blue-700
-                hover:file:bg-blue-100
-                focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
-            ">
-            <div class="flex items-center mt-4">
-                <input type="text" id="image-name" placeholder="Enter a name for the image"
-                       class="flex-grow p-2 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm">
-                <button id="upload-btn"
-                        class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-r-lg hover:bg-blue-700 transition duration-150 disabled:opacity-50">
-                    Save Image
-                </button>
+                file:bg-indigo-600 file:text-white
+                hover:file:bg-indigo-700 cursor-pointer mb-4">
+            
+            <button id="upload-button" class="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl transition duration-200 hover:bg-indigo-700 hover-lift disabled:bg-indigo-400">
+                Upload & Generate Link
+            </button>
+
+            <div id="loading-spinner" class="hidden text-center mt-4">
+                <svg class="animate-spin h-6 w-6 text-indigo-400 inline-block mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span class="text-gray-400">Uploading file... Please wait.</span>
             </div>
-            <p class="text-xs text-gray-500 mt-2">Note: Images are stored directly in Firestore as base64 strings. Keep file size small (&lt; 500KB) to avoid exceeding document limits and save bandwidth.</p>
+            <p id="auth-status" class="text-center text-sm mt-4 text-red-400 font-medium"></p>
         </div>
 
-        <!-- Image Gallery -->
-        <h2 class="text-2xl font-semibold text-gray-800 mb-4 border-b pb-2">Shared Images</h2>
-        <div id="image-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-h-[60vh] overflow-y-auto p-2">
-            <!-- Images will be inserted here -->
-            <p id="no-images-msg" class="col-span-full text-center text-gray-500 italic">No images have been shared yet. Start uploading!</p>
+        <!-- Image Table Section -->
+        <div id="image-table-container" class="mt-12">
+            <h2 class="text-2xl font-semibold mb-4 text-white border-b border-gray-700 pb-2">All Uploads History</h2>
+            
+            <!-- Responsive Table Wrapper -->
+            <div class="overflow-x-auto bg-gray-800 rounded-xl card-shadow">
+                <table class="min-w-full divide-y divide-gray-700">
+                    <thead class="bg-gray-700 sticky top-0">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                                Preview
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                                File Name / ID
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider hidden sm:table-cell">
+                                Timestamp
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                                Actions
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="image-table-body" class="divide-y divide-gray-700 bg-gray-800">
+                        <!-- Table Rows will be injected here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <p id="no-images-message" class="text-center text-gray-500 mt-8 hidden">
+                You haven't uploaded any images yet.
+            </p>
         </div>
     </div>
 
-    <!-- Firebase SDK Imports -->
+    <!-- Custom Modal for Notifications -->
+    <div id="notification-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center p-4 z-50 transition-opacity duration-300">
+        <div class="bg-gray-800 p-6 rounded-xl w-full max-w-sm card-shadow">
+            <h3 id="modal-title" class="text-xl font-bold mb-3 text-indigo-400">Notification</h3>
+            <p id="modal-message" class="text-gray-300 mb-6"></p>
+            <button id="modal-close-button" class="w-full py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition duration-200">
+                Close
+            </button>
+        </div>
+    </div>
+
     <script type="module">
+        // --- FIREBASE CONFIGURATION ---
+        // 1. Core Firebase SDKs
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, addDoc, onSnapshot, collection, query, serverTimestamp, orderBy, setLogLevel, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, query, onSnapshot, addDoc, doc, deleteDoc, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // 2. Firebase Storage SDK (Critical for large files)
+        import { getStorage, ref, uploadBytes, deleteObject, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
-        // --- GLOBAL STATE & FIREBASE SETUP ---
-        let db;
-        let auth;
-        let appId;
-        let userId;
+        // Your web app's Firebase configuration (Provided by user)
+        const firebaseConfig = {
+            apiKey: "AIzaSyBJELImxh2a5nx85UCHIxHgiD-H-v8LsxE",
+            authDomain: "image-uploader-46f04.firebaseapp.com",
+            projectId: "image-uploader-46f04",
+            storageBucket: "image-uploader-46f04.firebasestorage.app",
+            messagingSenderId: "1046392282951",
+            appId: "1:1046392282951:web:ca8e9e14d6281f03bef662",
+            measurementId: "G-WX74X0NEGK"
+        };
 
-        const uploadBtn = document.getElementById('upload-btn');
-        const fileInput = document.getElementById('image-upload');
-        const nameInput = document.getElementById('image-name');
-        const imageList = document.getElementById('image-list');
-        const statusMessage = document.getElementById('status-message');
-        const noImagesMsg = document.getElementById('no-images-msg');
+        // --- GLOBAL VARIABLES ---
+        let db, auth, storage;
+        let userId = 'anonymous'; // Default until authenticated
+        const app = initializeApp(firebaseConfig);
 
-        // Helper function to show notifications
-        function showStatus(message, isError = false) {
-            statusMessage.textContent = message;
-            statusMessage.className = `mb-4 text-center py-2 text-sm font-semibold text-white rounded-lg ${isError ? 'bg-red-500' : 'bg-green-500'}`;
-            statusMessage.classList.remove('hidden');
-            setTimeout(() => {
-                statusMessage.classList.add('hidden');
-            }, 5000);
+        // --- DOM ELEMENTS ---
+        const authStatusEl = document.getElementById('auth-status');
+        const uploadButton = document.getElementById('upload-button');
+        const imageFileEl = document.getElementById('image-file');
+        const tableBodyEl = document.getElementById('image-table-body');
+        const loadingSpinnerEl = document.getElementById('loading-spinner');
+        const noImagesMessageEl = document.getElementById('no-images-message');
+        
+        // Modal elements
+        const modalEl = document.getElementById('notification-modal');
+        const modalTitleEl = document.getElementById('modal-title');
+        const modalMessageEl = document.getElementById('modal-message');
+        const modalCloseButton = document.getElementById('modal-close-button');
+
+        // --- UTILITY FUNCTIONS ---
+
+        function showNotification(title, message) {
+            modalTitleEl.textContent = title;
+            modalMessageEl.textContent = message;
+            modalEl.classList.remove('hidden');
+            modalEl.classList.add('flex', 'opacity-0');
+            setTimeout(() => modalEl.classList.remove('opacity-0'), 10);
+            // Ensure the button handler is reset to "Close" on display
+            modalCloseButton.textContent = "Close";
+            modalCloseButton.onclick = () => {
+                modalEl.classList.add('opacity-0');
+                setTimeout(() => modalEl.classList.remove('flex'), 300);
+                setTimeout(() => modalEl.classList.add('hidden'), 300);
+            };
         }
 
-        // Helper function to convert File to Base64
-        function fileToBase64(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = error => reject(error);
-            });
-        }
+        // --- FIREBASE INITIALIZATION & AUTH ---
 
         async function initFirebase() {
-            setLogLevel('debug'); // Enable Firestore logging
-            let firebaseConfig;
-            
-            // NOTE: Using a static App ID for external hosting consistency.
-            const currentAppId = 'image-bin-github-app';
-
             try {
-                // -----------------------------------------------------------------------------------
-                // --- CRITICAL STEP FOR GITHUB/EXTERNAL HOSTING: CONFIGURATION SUPPLIED ---
-                // This configuration connects the app to your Firebase Project: image-uploader-46f04
-                // -----------------------------------------------------------------------------------
-                firebaseConfig = {
-                    apiKey: "AIzaSyBJELImxh2a5nx85UCHIxHgiD-H-v8LsxE",           
-                    authDomain: "image-uploader-46f04.firebaseapp.com",  
-                    projectId: "image-uploader-46f04",    
-                    storageBucket: "image-uploader-46f04.firebasestorage.app",
-                    messagingSenderId: "1046392282951",
-                    appId: "1:1046392282951:web:ca8e9e14d6281f03bef662",
-                    measurementId: "G-WX74X0NEGK"
-                };
-                
-                appId = currentAppId;
-                
-                // Initialize Firebase App and Services
-                const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
+                storage = getStorage(app); 
 
-                // Setting persistence to Local Storage to maintain user session permanently.
                 await setPersistence(auth, browserLocalPersistence);
 
-                // Sign in anonymously for a permanent, simple user ID.
-                await signInAnonymously(auth);
-
-                // Get current user ID and update UI
-                // Using crypto.randomUUID() as a final fallback if auth fails for some reason
-                userId = auth.currentUser?.uid || crypto.randomUUID(); 
-                document.getElementById('user-info').innerHTML = `Logged in as: <span class="font-mono text-xs bg-gray-100 p-1 rounded">${userId}</span> (App ID: ${appId})`;
-                uploadBtn.disabled = false;
-                showStatus('Firebase initialized and user authenticated!', false);
-
-                // Start listening for images
-                listenForImages();
-
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        authStatusEl.textContent = `Authenticated as: ${userId.substring(0, 8)}...`;
+                        authStatusEl.classList.remove('text-red-400');
+                        authStatusEl.classList.add('text-green-400');
+                        startImageListener(userId);
+                        uploadButton.disabled = false;
+                    } else {
+                        // Attempt permanent anonymous sign-in
+                        await signInAnonymously(auth);
+                    }
+                });
             } catch (error) {
                 console.error("Error initializing Firebase or signing in:", error);
-                document.getElementById('user-info').textContent = `Authentication Failed! Cannot start app.`;
-                uploadBtn.disabled = true;
-                // Show a detailed error message on the screen
-                showStatus(`Initialization Error: ${error.message}`, true);
+                authStatusEl.textContent = `Error: ${error.message}`;
+                uploadButton.disabled = true;
             }
         }
 
-        // --- FIRESTORE LOGIC ---
+        // --- FIRESTORE DATA HANDLING ---
 
-        // Collection path for public data: /artifacts/{appId}/public/data/images
-        function getCollectionRef() {
-            return collection(db, 'artifacts', appId, 'public', 'data', 'images');
-        }
+        const APP_ID = 'image-bin-github-app';
+        const collectionPath = `artifacts/${APP_ID}/public/data/images`; 
 
-        async function handleImageUpload() {
-            if (!db || !userId) {
-                showStatus('System not ready. Please wait for initialization.', true);
-                return;
-            }
+        function startImageListener(currentUserId) {
+            const imagesQuery = query(
+                collection(db, collectionPath),
+                orderBy('timestamp', 'desc')
+            );
 
-            const file = fileInput.files[0];
-            const name = nameInput.value.trim();
+            onSnapshot(imagesQuery, (snapshot) => {
+                tableBodyEl.innerHTML = '';
+                const images = [];
 
-            if (!file || !name) {
-                showStatus('Please select an image and enter a name.', true);
-                return;
-            }
-
-            // Check file size (approximate)
-            if (file.size > 500 * 1024) { // 500 KB limit for demonstration
-                showStatus('Image size is too large (>500KB). Please upload a smaller file.', true);
-                return;
-            }
-
-            uploadBtn.disabled = true;
-            uploadBtn.textContent = 'Uploading...';
-
-            try {
-                const base64Data = await fileToBase64(file);
-
-                await addDoc(getCollectionRef(), {
-                    name: name,
-                    imageUrl: base64Data, // Storing base64 directly in Firestore (only for small images)
-                    mimeType: file.type,
-                    uploadedBy: userId,
-                    createdAt: serverTimestamp()
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    images.push({ id: doc.id, ...data });
                 });
 
-                showStatus(`Image "${name}" uploaded successfully!`);
-                nameInput.value = '';
-                fileInput.value = ''; // Clear file input
-            } catch (e) {
-                console.error("Error adding document: ", e);
-                showStatus(`Failed to upload image: ${e.message}`, true);
-            } finally {
-                uploadBtn.disabled = false;
-                uploadBtn.textContent = 'Save Image';
-            }
+                if (images.length === 0) {
+                    noImagesMessageEl.classList.remove('hidden');
+                } else {
+                    noImagesMessageEl.classList.add('hidden');
+                    images.forEach(image => renderImageRow(image, currentUserId));
+                }
+            }, (error) => {
+                console.error("Error fetching images:", error);
+                showNotification("Database Error", "Failed to load image history. Check your Firestore rules.");
+            });
         }
         
-        // New function to handle image deletion
-        async function deleteImage(imageId, imageName, uploaderId) {
-            if (uploaderId !== userId) {
-                // This is a minimal check; Firestore security rules should handle the final authorization
-                showStatus(`You can only delete images you uploaded!`, true);
+        // --- UPLOAD AND DELETE LOGIC ---
+
+        async function uploadImage() {
+            const file = imageFileEl.files[0];
+            if (!file) {
+                showNotification("Missing File", "Please select an image file to upload.");
+                return;
+            }
+
+            loadingSpinnerEl.classList.remove('hidden');
+            uploadButton.disabled = true;
+
+            const fileExtension = file.name.split('.').pop();
+            const fileName = `${crypto.randomUUID()}.${fileExtension}`;
+            let publicUrl = '';
+
+            try {
+                // 1. Upload file to Firebase Storage
+                const storageRef = ref(storage, `images/${fileName}`);
+                const snapshot = await uploadBytes(storageRef, file);
+                
+                // 2. Get the permanent download URL
+                publicUrl = await getDownloadURL(snapshot.ref);
+
+                // 3. Save metadata to Firestore
+                await addDoc(collection(db, collectionPath), {
+                    fileName: fileName,
+                    originalName: file.name,
+                    publicUrl: publicUrl, 
+                    timestamp: serverTimestamp(),
+                    ownerId: userId,
+                    mimeType: file.type,
+                    size: file.size,
+                });
+
+                showNotification("Success!", `Image "${file.name}" uploaded and link generated.`);
+                imageFileEl.value = '';
+
+            } catch (error) {
+                console.error("Upload Error:", error);
+                showNotification("Upload Failed", `Could not upload image. Error: ${error.message}. Check Storage rules.`);
+            } finally {
+                loadingSpinnerEl.classList.add('hidden');
+                uploadButton.disabled = false;
+            }
+        }
+
+        function deleteImage(docId, storageFileName, ownerId) {
+            if (userId !== ownerId) {
+                showNotification("Permission Denied", "You can only delete images you uploaded.");
                 return;
             }
             
-            // Use a custom modal or window.confirm() as a substitute for alert/confirm since we're in an isolated environment.
-            const confirmed = window.confirm(`Are you sure you want to delete "${imageName}"?`);
-            if (!confirmed) return;
+            showNotification(
+                "Confirm Deletion", 
+                `Are you sure you want to permanently delete "${storageFileName}"?`
+            );
+            
+            // Re-purpose the modal button for confirmation
+            modalCloseButton.textContent = "Yes, Delete It";
+            modalCloseButton.onclick = () => {
+                performDeletion(docId, storageFileName);
+                // The modal will close automatically inside performDeletion or stay open on error
+            };
+        }
 
-
+        async function performDeletion(docId, storageFileName) {
             try {
-                const imageDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'images', imageId);
-                await deleteDoc(imageDocRef);
-                showStatus(`Image "${imageName}" deleted successfully!`);
-            } catch (e) {
-                console.error("Error deleting document: ", e);
-                showStatus(`Failed to delete image: ${e.message}`, true);
-            }
-        }
-
-        function renderImages(images) {
-            imageList.innerHTML = ''; // Clear current list
-
-            if (images.length === 0) {
-                noImagesMsg.classList.remove('hidden');
-                return;
-            } else {
-                noImagesMsg.classList.add('hidden');
-            }
-
-            images.forEach(image => {
-                const imageCard = document.createElement('div');
-                imageCard.className = 'bg-white border border-gray-200 rounded-xl shadow-md overflow-hidden transition-all hover:shadow-lg flex flex-col relative';
-
-                // Image Container
-                const imgContainer = document.createElement('div');
-                imgContainer.className = 'w-full h-40 bg-gray-100 overflow-hidden flex items-center justify-center';
-                const img = document.createElement('img');
-                img.src = image.imageUrl;
-                img.alt = image.name;
-                img.className = 'w-full h-full object-cover';
-                // Fallback for failed image load
-                img.onerror = () => {
-                    img.alt = "Failed to load image.";
-                    img.className = 'p-4 text-center text-gray-400 w-full h-full object-contain';
-                    // Using a responsive placeholder image URL
-                    img.src = `https://placehold.co/400x160/e5e7eb/6b7280?text=Load+Error`;
-                };
-                imgContainer.appendChild(img);
-                imageCard.appendChild(imgContainer);
-
-                // Content
-                const content = document.createElement('div');
-                content.className = 'p-4 flex-grow';
-
-                const name = document.createElement('h3');
-                name.textContent = image.name;
-                name.className = 'text-lg font-semibold text-gray-800 truncate';
-                content.appendChild(name);
-
-                const uploader = document.createElement('p');
-                uploader.textContent = `By: ${image.uploadedBy.substring(0, 8)}...`;
-                uploader.className = 'text-xs text-gray-500 mt-1';
-                content.appendChild(uploader);
-
-                const date = document.createElement('p');
-                // Format the timestamp if it exists
-                if (image.createdAt && image.createdAt.seconds) {
-                    const d = new Date(image.createdAt.seconds * 1000);
-                    date.textContent = d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-                } else {
-                    date.textContent = '...just now';
-                }
-                date.className = 'text-xs text-gray-500 mt-1';
-                content.appendChild(date);
+                // 1. Delete from Firebase Storage
+                const storageRef = ref(storage, `images/${storageFileName}`);
+                await deleteObject(storageRef);
                 
-                imageCard.appendChild(content);
+                // 2. Delete the metadata from Firestore
+                await deleteDoc(doc(db, collectionPath, docId));
 
-                // Delete Button (only visible if uploaded by current user)
-                if (image.uploadedBy === userId) {
-                    const deleteBtn = document.createElement('button');
-                    deleteBtn.innerHTML = '🗑️'; // Trash icon
-                    deleteBtn.className = 'absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full text-sm hover:bg-red-600 transition duration-150 shadow-md';
-                    deleteBtn.title = 'Delete this image';
-                    deleteBtn.onclick = () => deleteImage(image.id, image.name, image.uploadedBy);
-                    imageCard.appendChild(deleteBtn);
+                showNotification("Deleted", "Image successfully removed.");
+            } catch (error) {
+                console.error("Deletion Error:", error);
+                showNotification("Deletion Failed", `Could not delete file. Error: ${error.message}.`);
+            } finally {
+                // Ensure the modal button is reset after the operation
+                modalCloseButton.textContent = "Close"; 
+            }
+        }
+
+
+        // --- UI RENDERING (TABLE ROWS) ---
+
+        function renderImageRow(image, currentUserId) {
+            const isOwner = image.ownerId === currentUserId;
+            const formattedTime = image.timestamp ? new Date(image.timestamp.seconds * 1000).toLocaleString() : 'Loading...';
+
+            const row = document.createElement('tr');
+            row.className = 'hover:bg-gray-700 transition duration-150';
+            row.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="h-10 w-10 bg-gray-600 rounded-lg overflow-hidden flex items-center justify-center">
+                        <img src="${image.publicUrl}" alt="${image.originalName}" class="object-cover w-full h-full" loading="lazy">
+                    </div>
+                </td>
+                <td class="px-6 py-4">
+                    <p class="text-sm font-medium text-white truncate" title="${image.originalName}">${image.originalName}</p>
+                    <p class="text-xs text-gray-400 truncate hidden sm:block">ID: ${image.id.substring(0, 12)}...</p>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-400 hidden sm:table-cell">
+                    ${formattedTime}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div class="flex flex-col space-y-2">
+                        <a href="${image.publicUrl}" target="_blank" class="text-center py-1 text-xs font-semibold rounded-md bg-indigo-600 text-white hover:bg-indigo-700 transition duration-200">
+                            View Image
+                        </a>
+                        <button data-url="${image.publicUrl}" class="copy-link-btn text-center py-1 text-xs font-semibold rounded-md bg-gray-600 text-gray-200 hover:bg-gray-500 transition duration-200">
+                            Get Link
+                        </button>
+                        ${isOwner ? `
+                            <button data-id="${image.id}" data-filename="${image.fileName}" data-owner="${image.ownerId}" class="delete-btn text-center py-1 text-xs font-semibold rounded-md bg-red-600 text-white hover:bg-red-700 transition duration-200">
+                                Delete
+                            </button>
+                        ` : ''}
+                    </div>
+                </td>
+            `;
+            tableBodyEl.appendChild(row);
+
+            // Add event listeners for new buttons
+            row.querySelector('.copy-link-btn')?.addEventListener('click', (e) => {
+                const url = e.currentTarget.getAttribute('data-url');
+                const tempInput = document.createElement('input');
+                tempInput.value = url;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                try {
+                    document.execCommand('copy');
+                    e.currentTarget.textContent = 'Copied!';
+                    setTimeout(() => e.currentTarget.textContent = 'Get Link', 2000);
+                } catch (err) {
+                    showNotification("Copy Failed", "Your browser does not support automatic copying. Please manually copy the link from the view tab.");
                 }
+                document.body.removeChild(tempInput);
+            });
 
-                imageList.appendChild(imageCard);
+            row.querySelector('.delete-btn')?.addEventListener('click', (e) => {
+                const docId = e.currentTarget.getAttribute('data-id');
+                const fileName = e.currentTarget.getAttribute('data-filename');
+                const owner = e.currentTarget.getAttribute('data-owner');
+                deleteImage(docId, fileName, owner);
             });
         }
 
-        function listenForImages() {
-            // Sorting by timestamp to show latest first
-            const q = query(getCollectionRef(), orderBy('createdAt', 'desc'));
-
-            onSnapshot(q, (snapshot) => {
-                const images = [];
-                snapshot.forEach((doc) => {
-                    images.push({ id: doc.id, ...doc.data() });
-                });
-                renderImages(images);
-            }, (error) => {
-                console.error("Error listening to Firestore:", error);
-                showStatus(`Real-time error: Could not fetch shared data. ${error.message}`, true);
-            });
-        }
-
-
-        // --- EVENT LISTENERS & INITIALIZATION ---
-        uploadBtn.addEventListener('click', handleImageUpload);
-        uploadBtn.disabled = true; // Disable until Firebase is ready
-
-        // Start the application setup
-        window.addEventListener('load', initFirebase);
-
+        // --- EXECUTION ---
+        uploadButton.addEventListener('click', uploadImage);
+        window.onload = initFirebase;
     </script>
 </body>
 </html>
