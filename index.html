@@ -108,7 +108,8 @@
 </head>
 <body>
 
-    <div id="login-view" class="w-full max-w-md p-8 rounded-xl app-container mx-4 hidden">
+    <!-- NOTE: The 'login-view' is now visible by default. -->
+    <div id="login-view" class="w-full max-w-md p-8 rounded-xl app-container mx-4">
         <h1 class="text-3xl font-bold text-gray-100 text-center mb-2">Admin Panel</h1>
         <p class="text-gray-400 text-center mb-8">Sign in to manage images</p>
 
@@ -200,9 +201,27 @@
             query, serverTimestamp, setLogLevel
         } = window.firebase;
 
-        // Constants from the environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-image-bin-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        // --- IMPORTANT: CONFIGURATION BLOCK FOR EXTERNAL HOSTING ---
+        // Since you are hosting on GitHub Pages, the environment variables (__firebase_config, etc.) 
+        // are not available. YOU MUST REPLACE THE PLACEHOLDER VALUES BELOW 
+        // with your actual Firebase Web App Configuration.
+
+        const PLACEHOLDER_CONFIG = {
+            apiKey: "YOUR_API_KEY_HERE", // <-- REPLACE THIS
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com", // <-- REPLACE THIS
+            projectId: "YOUR_PROJECT_ID", // <-- REPLACE THIS
+            storageBucket: "YOUR_PROJECT_ID.appspot.com", // <-- REPLACE THIS
+            messagingSenderId: "SENDER_ID", // <-- REPLACE THIS
+            appId: "YOUR_APP_ID", // <-- REPLACE THIS
+            // measurementId is optional
+        };
+
+        // Use the hardcoded placeholder config when running externally
+        const firebaseConfig = PLACEHOLDER_CONFIG; 
+        
+        // This is used for the database path, giving a fallback ID
+        const appId = firebaseConfig.projectId || 'image-bin-default';
+        // ------------------------------------------------------------------
 
         // --- Global State ---
         let db = null;
@@ -239,6 +258,7 @@
         // --- Utility Functions ---
 
         function toggleView(isAuthenticated) {
+            // This logic is critical for switching between the two main screens
             if (isAuthenticated) {
                 loginView.classList.add('hidden');
                 uploaderView.classList.remove('hidden');
@@ -284,8 +304,16 @@
         // --- Firebase Initialization and Authentication ---
 
         function initFirebase() {
+            // Check if user has replaced the placeholder config
+            if (firebaseConfig.apiKey === "YOUR_API_KEY_HERE") {
+                showMessage('error', 'Error: Please update the **Firebase Configuration Block** in the script with your actual project keys.', 'login');
+                // Keep login view visible
+                toggleView(false);
+                return; 
+            }
+
             try {
-                // setLogLevel('Debug');
+                // setLogLevel('Debug'); // Uncomment for debugging
                 const app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
@@ -309,7 +337,7 @@
                         }
                         imageListContainer.innerHTML = '';
                         loadingStatus.textContent = 'Awaiting Admin Login...';
-                        showMessage('info', 'Firebase Authentication Ready. Enter your administrator credentials.', 'login');
+                        showMessage('info', 'Authentication Ready. Enter your administrator credentials.', 'login');
                     }
                 });
             } catch (error) {
@@ -335,7 +363,11 @@
                 const uploadedFiles = [];
                 snapshot.forEach((doc) => {
                     const data = doc.data();
-                    const timestamp = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleString() : 'N/A';
+                    // Fallback for timestamp if not present or incorrectly formatted
+                    const timestamp = data.timestamp && data.timestamp.seconds 
+                        ? new Date(data.timestamp.seconds * 1000).toLocaleString() 
+                        : 'N/A';
+                        
                     uploadedFiles.push({
                         id: doc.id,
                         name: data.name,
@@ -357,6 +389,7 @@
                 return;
             }
 
+            // The path ensures data is only accessible by this authenticated user
             const collectionPath = `artifacts/${appId}/users/${userId}/uploaded_images`;
             const imagesRef = collection(db, collectionPath);
 
@@ -369,7 +402,11 @@
                 showMessage('success', `Image "${name}" successfully uploaded and saved to history!`, 'uploader');
             } catch (error) {
                 console.error("Error writing document:", error);
-                showMessage('error', `Upload failed: Data too large or write permission denied. ${error.message}`, 'uploader');
+                // Check if the error is due to large data (Firestore limit is 1MB per document)
+                let errorMessage = error.message.includes('Value for argument "data" is not a valid Firestore document') 
+                                 ? 'Upload failed: Data URL size exceeds Firestore document limit (1MB).' 
+                                 : `Upload failed: ${error.message}`;
+                showMessage('error', errorMessage, 'uploader');
             }
         }
         
@@ -378,7 +415,7 @@
         function renderImageList(files) {
             loadingStatus.classList.add('hidden');
             if (files.length === 0) {
-                imageListContainer.innerHTML = '<p class="text-gray-500 text-center p-4 bg-gray-700 rounded-lg">No images uploaded yet.</p>';
+                imageListContainer.innerHTML = '<p class="text-gray-500 text-center p-4 bg-gray-700 rounded-lg">No images uploaded yet. Upload your first image!</p>';
                 return;
             }
 
@@ -429,6 +466,10 @@
                 showMessage('error', 'Please enter both email and password.', 'login');
                 return;
             }
+            if (!auth) {
+                showMessage('error', 'Firebase not initialized. Check your configuration.', 'login');
+                return;
+            }
 
             loginBtn.disabled = true;
             loginBtn.textContent = 'Logging In...';
@@ -441,8 +482,8 @@
             } catch (error) {
                 console.error("Login error:", error.code, error.message);
                 let errorMessage = 'Login failed. Please check your credentials.';
-                if (error.code === 'auth/user-not-found') {
-                    errorMessage = 'User not found. Check email or use Reset link to set up.';
+                if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+                    errorMessage = 'Invalid email or password. Use Reset link to set up.';
                 } else if (error.code === 'auth/wrong-password') {
                     errorMessage = 'Incorrect password.';
                 }
@@ -459,6 +500,10 @@
                 showMessage('info', 'Enter your administrator email in the field above to receive the password reset link.', 'login');
                 return;
             }
+            if (!auth) {
+                showMessage('error', 'Firebase not initialized. Check your configuration.', 'login');
+                return;
+            }
 
             resetPasswordBtn.disabled = true;
             showMessage('loading', `Sending password reset link to ${email}...`, 'login');
@@ -470,7 +515,7 @@
                 console.error("Password reset error:", error.code, error.message);
                 let errorMessage = 'Password setup/reset failed.';
                 if (error.code === 'auth/user-not-found') {
-                    errorMessage = 'User not registered. Cannot send reset link.';
+                    errorMessage = 'User not found. Cannot send reset link.';
                 }
                 showMessage('error', errorMessage, 'login');
             } finally {
@@ -479,6 +524,7 @@
         });
         
         logoutBtn.addEventListener('click', async () => {
+            if (!auth) return;
             try {
                 await signOut(auth);
                 // AuthStateChanged listener handles the view switch on sign out
@@ -491,8 +537,12 @@
         // --- Combined Event Listeners (Uploader) ---
 
         function handleFile(file) {
-            if (!file || !file.type.startsWith('image/') || file.size > 10 * 1024 * 1024) {
-                showMessage('error', 'Invalid file (must be image < 10MB).', 'uploader');
+            // Firestore documents are limited to 1MB. Data URLs for images are often larger.
+            const MAX_SIZE_MB = 1; 
+            const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+
+            if (!file || !file.type.startsWith('image/') || file.size > MAX_SIZE_BYTES) {
+                showMessage('error', `Invalid file (must be image < ${MAX_SIZE_MB}MB).`, 'uploader');
                 selectedFile = null;
                 uploadButton.disabled = linkButton.disabled = true;
                 previewSection.classList.add('hidden');
