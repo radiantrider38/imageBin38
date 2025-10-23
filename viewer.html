@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Viewer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a1a1a;
+            color: #e5e5e5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .image-container {
+            max-width: 90vw;
+            max-height: 90vh;
+        }
+        .full-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 0.75rem; /* rounded-xl */
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loading" class="text-center">
+        <svg class="animate-spin h-8 w-8 text-indigo-400 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <p>Loading image...</p>
+    </div>
+
+    <div id="content" class="hidden image-container">
+        <img id="image-display" class="full-image" alt="Uploaded Image">
+    </div>
+
+    <div id="error-message" class="hidden text-center p-6 bg-red-900 bg-opacity-30 rounded-lg max-w-sm">
+        <h1 class="text-xl font-bold text-red-400 mb-2">Error</h1>
+        <p id="error-text" class="text-red-200">Could not find the specified image or a connection error occurred.</p>
+    </div>
+
+    <script type="module">
+        // --- FIREBASE IMPORTS ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- FIREBASE CONFIGURATION (Must match index.html) ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyBJELImxh2a5nx85UCHIxHgiD-H-v8LsxE",
+            authDomain: "image-uploader-46f04.firebaseapp.com",
+            projectId: "image-uploader-46f04",
+            storageBucket: "image-uploader-46f04.firebasestorage.app", 
+            messagingSenderId: "1046392282951",
+            appId: "1:1046392282951:web:ca8e9e14d6281f03bef662",
+            measurementId: "G-WX74X0NEGK"
+        };
+
+        // --- GLOBAL CONSTANTS ---
+        const APP_ID = 'image-bin-github-app';
+        const collectionPath = `artifacts/${APP_ID}/public/data/images`;
+        
+        // --- DOM ELEMENTS ---
+        const loadingEl = document.getElementById('loading');
+        const contentEl = document.getElementById('content');
+        const imageDisplayEl = document.getElementById('image-display');
+        const errorEl = document.getElementById('error-message');
+        const errorTextEl = document.getElementById('error-text');
+
+        // --- UTILITY FUNCTION ---
+        function displayError(message) {
+            loadingEl.classList.add('hidden');
+            contentEl.classList.add('hidden');
+            errorTextEl.textContent = message;
+            errorEl.classList.remove('hidden');
+        }
+
+        /**
+         * Parses the URL to get the document ID from the '?id=' query parameter.
+         */
+        function getDocumentId() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('id');
+        }
+
+        // --- MAIN EXECUTION LOGIC ---
+        async function loadAndDisplayImage() {
+            const docId = getDocumentId();
+
+            if (!docId) {
+                return displayError("Invalid link format. Missing image ID.");
+            }
+
+            try {
+                // 1. Initialize Firebase services
+                const app = initializeApp(firebaseConfig);
+                const db = getFirestore(app);
+                const auth = getAuth(app);
+                
+                // 2. Authenticate anonymously (required to read public Firestore data)
+                await signInAnonymously(auth);
+
+                // 3. Fetch the image document quickly
+                const docRef = doc(db, collectionPath, docId);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    const base64Data = data.base64Data;
+                    
+                    if (base64Data) {
+                        // 4. Display the image
+                        imageDisplayEl.src = base64Data;
+                        imageDisplayEl.alt = data.fileName || "Image";
+                        
+                        // Set the page title to the file name
+                        document.title = data.fileName || "Image Viewer";
+                        
+                        // 5. Update UI
+                        loadingEl.classList.add('hidden');
+                        contentEl.classList.remove('hidden');
+                    } else {
+                         displayError("Image data found, but it is empty.");
+                    }
+                } else {
+                    displayError(`Image with ID "${docId}" not found in the database.`);
+                }
+            } catch (error) {
+                console.error("Image loading failed:", error);
+                // For security, a generic message is displayed.
+                displayError("A database error occurred. Check the console for details.");
+            }
+        }
+
+        window.onload = loadAndDisplayImage;
+    </script>
+</body>
+</html>
