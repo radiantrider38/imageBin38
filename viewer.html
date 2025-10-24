@@ -3,59 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image Viewer</title>
+    <title id="page-title">Loading Image...</title>
+    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Use Inter Font -->
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #1a1a1a;
+            background-color: #0d0d0d;
             color: #e5e5e5;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
         }
-        .image-container {
-            max-width: 90vw;
-            max-height: 90vh;
-        }
-        .full-image {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
-            border-radius: 0.75rem; /* rounded-xl */
-            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.5);
-        }
+        .card-shadow { box-shadow: 0 8px 25px rgba(0, 0, 0, 0.7); }
     </style>
 </head>
-<body>
 
-    <div id="loading" class="text-center">
-        <svg class="animate-spin h-8 w-8 text-indigo-400 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        <p>Loading image...</p>
-    </div>
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div id="viewer-container" class="w-full max-w-4xl text-center">
 
-    <div id="content" class="hidden image-container">
-        <img id="image-display" class="full-image" alt="Uploaded Image">
-    </div>
+        <!-- Header -->
+        <header class="mb-6">
+            <h1 class="text-3xl font-extrabold text-indigo-400">Image Viewer</h1>
+            <p class="text-gray-400 mt-1" id="file-name-display">Fetching image details...</p>
+        </header>
 
-    <div id="error-message" class="hidden text-center p-6 bg-red-900 bg-opacity-30 rounded-lg max-w-sm">
-        <h1 class="text-xl font-bold text-red-400 mb-2">Error</h1>
-        <p id="error-text" class="text-red-200">Could not find the specified image or a connection error occurred.</p>
+        <!-- Main Image Display Card -->
+        <div id="image-card" class="bg-gray-800 p-4 rounded-xl card-shadow flex flex-col items-center justify-center min-h-[300px]">
+            
+            <!-- Loading State -->
+            <div id="loading-state" class="text-center">
+                <svg class="animate-spin h-8 w-8 text-indigo-400 inline-block mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p class="text-gray-400">Loading image from database...</p>
+            </div>
+
+            <!-- Image/Error Display -->
+            <img id="main-image" src="" alt="Viewed Image" class="hidden max-w-full max-h-[80vh] rounded-lg shadow-lg" style="object-fit: contain;">
+            
+            <p id="error-message" class="text-red-400 font-medium hidden mt-4">Image not found or an error occurred.</p>
+        </div>
+
+        <!-- Action Buttons -->
+        <div id="action-buttons" class="mt-6 flex justify-center space-x-4 hidden">
+            <button id="download-button" class="flex items-center space-x-2 py-2 px-4 bg-indigo-600 text-white font-semibold rounded-lg transition duration-200 hover:bg-indigo-700 hover:scale-[1.02]">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                <span>Download</span>
+            </button>
+            <a href="index.html" class="flex items-center space-x-2 py-2 px-4 bg-gray-600 text-white font-semibold rounded-lg transition duration-200 hover:bg-gray-700 hover:scale-[1.02]">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                <span>Back to Gallery</span>
+            </a>
+        </div>
     </div>
 
     <script type="module">
-        // --- FIREBASE IMPORTS ---
+        // --- FIREBASE CONFIGURATION ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- FIREBASE CONFIGURATION (Must match index.html) ---
+        // Reusing the same Firebase configuration from index.html
         const firebaseConfig = {
             apiKey: "AIzaSyBJELImxh2a5nx85UCHIxHgiD-H-v8LsxE",
             authDomain: "image-uploader-46f04.firebaseapp.com",
@@ -65,84 +74,115 @@
             appId: "1:1046392282951:web:ca8e9e14d6281f03bef662",
             measurementId: "G-WX74X0NEGK"
         };
-
-        // --- GLOBAL CONSTANTS ---
+        
+        // --- GLOBAL VARIABLES & CONSTANTS ---
         const APP_ID = 'image-bin-github-app';
-        const collectionPath = `artifacts/${APP_ID}/public/data/images`;
+        const collectionPath = `artifacts/${APP_ID}/public/data/images`; 
+        
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
         
         // --- DOM ELEMENTS ---
-        const loadingEl = document.getElementById('loading');
-        const contentEl = document.getElementById('content');
-        const imageDisplayEl = document.getElementById('image-display');
-        const errorEl = document.getElementById('error-message');
-        const errorTextEl = document.getElementById('error-text');
+        const pageTitleEl = document.getElementById('page-title');
+        const fileNameDisplayEl = document.getElementById('file-name-display');
+        const loadingStateEl = document.getElementById('loading-state');
+        const mainImageEl = document.getElementById('main-image');
+        const errorMessageEl = document.getElementById('error-message');
+        const actionButtonsEl = document.getElementById('action-buttons');
+        const downloadButton = document.getElementById('download-button');
 
-        // --- UTILITY FUNCTION ---
-        function displayError(message) {
-            loadingEl.classList.add('hidden');
-            contentEl.classList.add('hidden');
-            errorTextEl.textContent = message;
-            errorEl.classList.remove('hidden');
-        }
+        // --- UTILITY FUNCTIONS ---
 
         /**
-         * Parses the URL to get the document ID from the '?id=' query parameter.
+         * Extracts the image ID from the URL query parameters.
+         * @returns {string|null} The image ID or null if not found.
          */
-        function getDocumentId() {
+        function getImageIdFromUrl() {
             const params = new URLSearchParams(window.location.search);
             return params.get('id');
         }
 
-        // --- MAIN EXECUTION LOGIC ---
-        async function loadAndDisplayImage() {
-            const docId = getDocumentId();
-
-            if (!docId) {
-                return displayError("Invalid link format. Missing image ID.");
-            }
+        /**
+         * Fetches image data from Firestore using the document ID.
+         * @param {string} id The Firestore document ID.
+         */
+        async function fetchAndDisplayImage(id) {
+            loadingStateEl.classList.remove('hidden');
+            mainImageEl.classList.add('hidden');
+            errorMessageEl.classList.add('hidden');
+            actionButtonsEl.classList.add('hidden');
+            pageTitleEl.textContent = "Loading...";
 
             try {
-                // 1. Initialize Firebase services
-                const app = initializeApp(firebaseConfig);
-                const db = getFirestore(app);
-                const auth = getAuth(app);
-                
-                // 2. Authenticate anonymously (required to read public Firestore data)
+                // The viewer needs to sign in anonymously to satisfy Firestore security rules
                 await signInAnonymously(auth);
 
-                // 3. Fetch the image document quickly
-                const docRef = doc(db, collectionPath, docId);
-                const docSnap = await getDoc(docRef);
+                const imageRef = doc(db, collectionPath, id);
+                const docSnap = await getDoc(imageRef);
 
                 if (docSnap.exists()) {
                     const data = docSnap.data();
-                    const base64Data = data.base64Data;
                     
-                    if (base64Data) {
-                        // 4. Display the image
-                        imageDisplayEl.src = base64Data;
-                        imageDisplayEl.alt = data.fileName || "Image";
-                        
-                        // Set the page title to the file name
-                        document.title = data.fileName || "Image Viewer";
-                        
-                        // 5. Update UI
-                        loadingEl.classList.add('hidden');
-                        contentEl.classList.remove('hidden');
-                    } else {
-                         displayError("Image data found, but it is empty.");
-                    }
+                    // Display details
+                    fileNameDisplayEl.textContent = `File: ${data.fileName}`;
+                    pageTitleEl.textContent = data.fileName;
+
+                    // Display image
+                    mainImageEl.src = data.base64Data;
+                    mainImageEl.classList.remove('hidden');
+                    
+                    // Setup download button
+                    downloadButton.onclick = () => downloadImage(data.base64Data, data.fileName);
+
+                    actionButtonsEl.classList.remove('hidden');
                 } else {
-                    displayError(`Image with ID "${docId}" not found in the database.`);
+                    throw new Error("Document not found.");
                 }
             } catch (error) {
-                console.error("Image loading failed:", error);
-                // For security, a generic message is displayed.
-                displayError("A database error occurred. Check the console for details.");
+                console.error("Error fetching or displaying image:", error);
+                fileNameDisplayEl.textContent = "Error loading image.";
+                errorMessageEl.textContent = "The image link is invalid, the image may have been deleted, or a network error occurred.";
+                errorMessageEl.classList.remove('hidden');
+                pageTitleEl.textContent = "Image Not Found";
+            } finally {
+                loadingStateEl.classList.add('hidden');
             }
         }
 
-        window.onload = loadAndDisplayImage;
+        /**
+         * Triggers a download of the base64 image data.
+         * @param {string} dataUrl Base64 data URL of the image.
+         * @param {string} filename Suggested file name.
+         */
+        function downloadImage(dataUrl, filename) {
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+
+        // --- EXECUTION ---
+
+        window.onload = function() {
+            const imageId = getImageIdFromUrl();
+            if (imageId) {
+                // Ensure Firebase auth is ready before fetching
+                onAuthStateChanged(auth, (user) => {
+                    // This listener ensures we are authenticated (even anonymously) before fetching
+                    fetchAndDisplayImage(imageId);
+                });
+            } else {
+                fileNameDisplayEl.textContent = "Missing Image ID in URL.";
+                errorMessageEl.textContent = "The URL is missing the necessary image ID. Please return to the gallery to get a valid link.";
+                errorMessageEl.classList.remove('hidden');
+                loadingStateEl.classList.add('hidden');
+                actionButtonsEl.classList.remove('hidden'); // Show back button
+            }
+        };
     </script>
 </body>
 </html>
