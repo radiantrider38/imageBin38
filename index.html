@@ -127,12 +127,13 @@
         let db, auth;
         let userId = 'anonymous'; 
         const app = initializeApp(firebaseConfig);
+        // Limits to ensure we stay within Firestore's free document size limit
         const MAX_FILE_SIZE_BYTES = 950 * 1024; // ~0.95MB
         const MAX_DIMENSION = 1200; // Max width or height in pixels for resizing
         const JPG_QUALITY = 0.8;    // Compression quality for JPG output
         
-        // IMPORTANT: This constructs the short URL pointing to the viewer.html in the same directory.
-        const VIEWER_BASE_URL = window.location.href.replace('index.html', 'viewer.html').split('?')[0];
+        // This is the correct, short, relative path to the public viewer file.
+        const VIEWER_BASE_URL = 'viewer.html';
 
         // --- DOM ELEMENTS (omitted for brevity) ---
         const authStatusEl = document.getElementById('auth-status');
@@ -364,7 +365,7 @@
             const isOwner = image.ownerId === currentUserId;
             const formattedTime = image.timestamp ? new Date(image.timestamp.seconds * 1000).toLocaleString() : 'Loading...';
             
-            // Construct the short, public URL to the viewer page
+            // Construct the short, public URL to the viewer page using the fixed base URL
             const shortUrl = `${VIEWER_BASE_URL}?id=${image.id}`;
 
             const row = document.createElement('tr');
