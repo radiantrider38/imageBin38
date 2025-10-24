@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image Gallery & Viewer</title>
+    <title>Secure Image Uploader & Gallery</title>
     <!-- Load Tailwind CSS (CDN is fine for this environment) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Load Icons -->
@@ -13,28 +13,29 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap');
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #111827; /* Dark Slate Background */
+            background-color: #0d1117; /* Very Dark Background */
             color: #f3f4f6;
         }
         .container-card {
-            background-color: #1f2937; /* Slightly lighter card background */
-            box-shadow: 0 0 40px rgba(0, 0, 0, 0.4);
-            border: 1px solid #374151;
+            background-color: #161b22; /* Card background */
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.6);
+            border: 1px solid #30363d;
         }
         .btn-action {
             transition: all 0.2s;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
         }
         .btn-primary {
-            background-color: #4f46e5; /* Indigo-600 */
+            background-color: #238636; /* GitHub Green */
         }
         .btn-primary:hover {
-            background-color: #4338ca; /* Indigo-700 */
+            background-color: #2ea043;
         }
         .delete-btn {
-            background-color: #dc2626; /* Red-600 */
+            background-color: #da3633; /* GitHub Red */
         }
         .delete-btn:hover {
-            background-color: #b91c1c; /* Red-700 */
+            background-color: #f85149;
         }
         /* Style for link icon on hover */
         .link-icon {
@@ -49,7 +50,7 @@
             height: 6px;
         }
         #gallery-container::-webkit-scrollbar-thumb {
-            background: #6366f1;
+            background: #238636;
             border-radius: 3px;
         }
     </style>
@@ -60,7 +61,7 @@
     <div id="app-container" class="w-full max-w-6xl container-card rounded-xl p-6 md:p-10 mt-10">
         <!-- Initial loading message -->
         <div id="loading-initial" class="text-center p-8 text-gray-400">
-             <svg class="animate-spin h-8 w-8 text-indigo-400 inline-block mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+             <svg class="animate-spin h-8 w-8 text-green-400 inline-block mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
@@ -89,10 +90,32 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, addDoc, deleteDoc, onSnapshot, collection, query, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- GLOBAL VARIABLES (Provided by Canvas) ---
-        // Fallback IDs are provided in case the variables are somehow undefined, though they shouldn't be.
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-image-bin-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        // --- HARDCODED FALLBACK CONFIG (Using the values provided by the user) ---
+        const FALLBACK_FIREBASE_CONFIG = {
+            apiKey: "AIzaSyBJELImxh2a5nx85UCHIxHgiD-H-v8LsxE",
+            authDomain: "image-uploader-46f04.firebaseapp.com",
+            projectId: "image-uploader-46f04",
+            storageBucket: "image-uploader-46f04.firebasestorage.app",
+            messagingSenderId: "1046392282951",
+            appId: "1:1046392282951:web:ca8e9e14d6281f03bef662",
+            measurementId: "G-WX74X0NEGK"
+        };
+        
+        // --- GLOBAL VARIABLES (Provided by Canvas, with fallbacks) ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'image-uploader-46f04';
+
+        // Safely parse the global config, falling back to an empty object if undefined/malformed
+        let globalConfig;
+        try {
+            globalConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        } catch (e) {
+            globalConfig = {};
+            console.warn("Could not parse __firebase_config. Falling back to hardcoded configuration.");
+        }
+        
+        // Determine final config: use global if it has a projectId, otherwise use fallback
+        const firebaseConfig = (globalConfig && globalConfig.projectId) ? globalConfig : FALLBACK_FIREBASE_CONFIG;
+        
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         // --- GLOBAL STATE ---
@@ -112,16 +135,15 @@
         let imageToDeleteId = null;
 
         // --- PATHS ---
-        const PUBLIC_COLLECTION_PATH = `artifacts/${appId}/public/data/images`;
+        // Using the user's provided projectId in the path if necessary, otherwise the global appId
+        const projectIdUsed = firebaseConfig.projectId || appId;
+        const PUBLIC_COLLECTION_PATH = `artifacts/${projectIdUsed}/public/data/images`;
 
         // --- UTILITIES ---
 
         /** Generates an absolute URL for sharing. */
         function getAbsoluteShareUrl(imageId) {
-            // Get the base URL (e.g., https://user.github.io/repo/)
             const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
-            
-            // Ensures the path is always absolute, pointing back to the current file with the ID.
             return `${baseUrl}index.html?id=${imageId}`;
         }
         
@@ -203,6 +225,9 @@
             onAuthStateChanged(auth, (user) => {
                 if (user) {
                     currentUserId = user.uid;
+                    // Display user ID for sharing/debugging
+                    console.log("Authenticated User ID:", currentUserId); 
+                    
                     if (imageId) {
                         renderViewerView(imageId);
                     } else {
@@ -210,8 +235,8 @@
                         loadImagesFromFirestore();
                     }
                 } else {
-                    // This case is unlikely to be hit if sign-in is successful in initApp
-                    console.log("Authentication state not ready yet.");
+                    // This case should be rare since we sign in on initApp
+                    console.log("Authentication state not ready/user signed out.");
                 }
             });
         }
@@ -222,17 +247,17 @@
         function renderGalleryView() {
             appContainer.innerHTML = `
                 <div class="text-center mb-10">
-                    <h1 class="text-4xl font-extrabold text-indigo-400 mb-2">Image Gallery</h1>
-                    <p class="text-gray-400">Upload your images, get a shareable link, and view the real-time history.</p>
+                    <h1 class="text-4xl font-extrabold text-green-400 mb-2">Secure Image Uploader & Gallery</h1>
+                    <p class="text-gray-400">Share images instantly! Your unique ID: <span class="font-mono text-xs text-yellow-400">${currentUserId}</span></p>
                 </div>
 
                 <!-- UPLOAD SECTION -->
-                <div class="mb-10 p-6 bg-gray-800 rounded-xl">
+                <div class="mb-10 p-6 bg-gray-900 rounded-xl border border-gray-700">
                     <h2 class="text-2xl font-bold text-gray-200 mb-4">Upload New Image</h2>
-                    <div id="drop-zone" class="p-8 text-center border-2 border-dashed border-indigo-500 rounded-xl cursor-pointer hover:bg-gray-700 transition duration-300">
-                        <svg class="mx-auto h-12 w-12 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v8"></path></svg>
-                        <p class="mt-2 text-sm text-gray-300"><span class="font-semibold text-indigo-400">Click to select image</span> or drag and drop</p>
-                        <p class="text-xs text-gray-500 mt-1">Files over 1MB will be resized automatically.</p>
+                    <div id="drop-zone" class="p-8 text-center border-2 border-dashed border-green-500 rounded-xl cursor-pointer hover:bg-gray-800 transition duration-300">
+                        <svg class="mx-auto h-12 w-12 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v8"></path></svg>
+                        <p class="mt-2 text-sm text-gray-300"><span class="font-semibold text-green-400">Click to select image</span> or drag and drop</p>
+                        <p class="text-xs text-gray-500 mt-1">Files over 1MB will be resized automatically (max dimension ${MAX_IMAGE_DIMENSION}px).</p>
                     </div>
                     
                     <div id="upload-status-area" class="mt-4 hidden p-4 bg-gray-700 rounded-lg">
@@ -240,7 +265,7 @@
                         <div id="upload-message" class="mt-2 text-sm text-yellow-300"></div>
                         <div class="flex mt-4 space-x-4">
                             <button id="upload-btn" class="btn-action btn-primary flex-1 py-2 text-white font-semibold rounded-lg disabled:opacity-50" disabled>
-                                <i class="fas fa-cloud-upload-alt mr-2"></i> Upload & Generate Link
+                                <i class="fas fa-cloud-upload-alt mr-2"></i> Upload & Get Link
                             </button>
                             <button id="clear-btn" class="btn-action bg-gray-600 hover:bg-gray-500 py-2 px-4 text-white font-semibold rounded-lg">
                                 <i class="fas fa-times"></i> Clear
@@ -251,11 +276,11 @@
 
                 <!-- IMAGE TABLE -->
                 <div class="mt-12">
-                    <h2 class="text-2xl font-bold text-gray-200 mb-4 border-b border-indigo-500 pb-2">Image History</h2>
+                    <h2 class="text-2xl font-bold text-gray-200 mb-4 border-b border-green-500 pb-2">Image History</h2>
                     <p id="loading-status" class="text-gray-400 text-center p-4">Fetching history from Firestore...</p>
                     <div id="gallery-container" class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-700 rounded-xl overflow-hidden shadow-lg hidden" id="image-table">
-                            <thead class="bg-indigo-600/70">
+                            <thead class="bg-gray-700/70">
                                 <tr>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Preview</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Name</th>
@@ -294,7 +319,7 @@
                             <img src="${image.base64Data}" alt="Thumbnail" class="w-full h-full object-cover rounded-md border border-gray-600">
                             <!-- Link Icon Overlay -->
                             <button onclick="event.stopPropagation(); copyToClipboard('${absoluteLink}', 'Absolute Share URL copied!');"
-                                    class="link-icon absolute inset-0 flex items-center justify-center bg-black bg-opacity-60 rounded-md text-indigo-400 hover:text-white transition duration-200">
+                                    class="link-icon absolute inset-0 flex items-center justify-center bg-black bg-opacity-60 rounded-md text-green-400 hover:text-white transition duration-200">
                                 <i class="fas fa-link text-lg"></i>
                             </button>
                         </div>
@@ -306,7 +331,7 @@
                     <td class="px-3 py-3 text-center whitespace-nowrap">
                         <div class="flex space-x-2 justify-center">
                             <!-- View Button (Always visible, opens in new tab) -->
-                            <a href="${absoluteLink}" target="_blank" class="btn-action p-2 text-sm font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition duration-150 shadow-md">
+                            <a href="${absoluteLink}" target="_blank" class="btn-action p-2 text-sm font-semibold rounded-lg bg-gray-600 hover:bg-gray-500 text-white transition duration-150 shadow-md">
                                 <i class="fas fa-eye"></i> View
                             </a>
                             <!-- Delete Button (Only visible for owner) -->
@@ -328,12 +353,12 @@
             appContainer.innerHTML = `
                 <div class="w-full mx-auto text-center">
                     <!-- Image Container/Status Display -->
-                    <div id="viewer-card" class="bg-gray-800 p-6 rounded-xl shadow-2xl flex flex-col items-center justify-center min-h-96 border border-indigo-700">
-                        <h1 id="image-title" class="text-3xl font-extrabold text-indigo-400 mb-4">Loading Image...</h1>
+                    <div id="viewer-card" class="bg-gray-900 p-6 rounded-xl shadow-2xl flex flex-col items-center justify-center min-h-96 border border-green-700">
+                        <h1 id="image-title" class="text-3xl font-extrabold text-green-400 mb-4">Loading Image...</h1>
                         <p id="image-details" class="text-gray-400 mb-6"></p>
 
                         <div id="loading-spinner" class="text-center">
-                            <svg class="animate-spin h-8 w-8 text-indigo-400 inline-block mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <svg class="animate-spin h-8 w-8 text-green-400 inline-block mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
@@ -350,7 +375,7 @@
 
                     </div>
                     
-                    <a href="index.html" class="mt-6 inline-block py-2 px-6 bg-indigo-600 text-white font-semibold rounded-full hover:bg-indigo-700 transition duration-200">
+                    <a href="index.html" class="mt-6 inline-block py-2 px-6 bg-gray-600 text-white font-semibold rounded-full hover:bg-gray-500 transition duration-200">
                         ← Go Back to Gallery
                     </a>
                 </div>
@@ -378,7 +403,6 @@
             };
 
             try {
-                // The current user must be authenticated (even anonymously) to satisfy security rules.
                 if (!db) throw new Error("Database not initialized."); 
                 
                 const imageRef = doc(db, PUBLIC_COLLECTION_PATH, imageId);
@@ -559,8 +583,9 @@
 
             // --- Table Delete Listener ---
             appContainer.addEventListener('click', (e) => {
-                if (e.target.classList.contains('delete-btn')) {
-                    imageToDeleteId = e.target.getAttribute('data-id');
+                const target = e.target.closest('.delete-btn');
+                if (target) {
+                    imageToDeleteId = target.getAttribute('data-id');
                     deleteModal.style.display = 'flex';
                 }
             });
@@ -647,11 +672,9 @@
         async function initApp() {
             const loadingInitial = document.getElementById('loading-initial');
             try {
-                // setLogLevel('Debug'); // Uncomment for debugging
-                
-                // CRITICAL FIX: The check that prevents the Firebase crash
+                // Ensure we have a projectId before attempting to initialize
                 if (!firebaseConfig || !firebaseConfig.projectId) {
-                    throw new Error("Missing Firebase configuration. The 'projectId' is required to connect to the database. Please ensure your environment is correctly configured.");
+                    throw new Error("Missing 'projectId'. Initialization aborted.");
                 }
 
                 const app = initializeApp(firebaseConfig);
@@ -674,7 +697,7 @@
                     <div class="p-8 text-center bg-red-900/30 rounded-xl border border-red-700">
                         <h2 class="text-2xl text-red-400 font-bold mb-3">Initialization Error</h2>
                         <p class="text-red-300">The application could not start because it failed to initialize the database.</p>
-                        <p class="text-sm text-red-200 mt-2">${error.message}</p>
+                        <p class="text-sm text-red-200 mt-2">Error details: ${error.message}</p>
                     </div>
                 `;
             } finally {
