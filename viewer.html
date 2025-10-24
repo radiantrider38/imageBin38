@@ -53,7 +53,7 @@
     <script type="module">
         // --- FIREBASE CONFIGURATION ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // IMPORTANT: Ensure this configuration matches the one in index.html
@@ -79,6 +79,11 @@
         const sharedImageEl = document.getElementById('shared-image');
         const errorMessageEl = document.getElementById('error-message');
 
+        // Initialize Firebase services globally
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
 
         // --- MAIN LOGIC ---
 
@@ -86,25 +91,19 @@
             const urlParams = new URLSearchParams(window.location.search);
             return urlParams.get(name);
         }
+        
+        function displayError(title, message) {
+            imageTitleEl.textContent = title;
+            imageDetailsEl.textContent = '';
+            loadingSpinnerEl.classList.add('hidden');
+            errorMessageEl.textContent = message;
+            errorMessageEl.classList.remove('hidden');
+            imageDisplayContainerEl.classList.add('hidden');
+        }
 
-        async function initViewer() {
-            const imageId = getQueryParameter('id');
-            
-            if (!imageId) {
-                displayError("No Image ID Provided", "The URL is missing the unique image identifier (ID).");
-                return;
-            }
-
+        async function fetchImage(imageId) {
             try {
-                // 1. Initialize Firebase
-                const app = initializeApp(firebaseConfig);
-                const db = getFirestore(app);
-                const auth = getAuth(app);
-                
-                // 2. Sign in anonymously (required to read public data per security rules)
-                await signInAnonymously(auth);
-
-                // 3. Fetch Document
+                // 1. Fetch Document
                 const imageRef = doc(db, collectionPath, imageId);
                 const docSnap = await getDoc(imageRef);
 
@@ -125,18 +124,34 @@
                 }
                 
             } catch (error) {
-                console.error("Viewer Initialization Error:", error);
-                displayError("System Error", `An error occurred while loading the image: ${error.message}`);
+                console.error("Image Fetch Error:", error);
+                // Check for permission errors often caused by failed authentication
+                displayError("Database Error", `Failed to retrieve data. This may be due to a permissions issue or network error.`);
             }
         }
-        
-        function displayError(title, message) {
-            imageTitleEl.textContent = title;
-            imageDetailsEl.textContent = '';
-            loadingSpinnerEl.classList.add('hidden');
-            errorMessageEl.textContent = message;
-            errorMessageEl.classList.remove('hidden');
-            imageDisplayContainerEl.classList.add('hidden');
+
+        function initViewer() {
+            const imageId = getQueryParameter('id');
+            
+            if (!imageId) {
+                displayError("No Image ID Provided", "The URL is missing the unique image identifier (ID).");
+                return;
+            }
+
+            // Ensure authentication is complete before fetching
+            // Use onAuthStateChanged to wait for the user to be fully authenticated (anonymously)
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    // User is signed in, now fetch the image
+                    fetchImage(imageId);
+                } else {
+                    // Try to sign in anonymously if not yet signed in (this should trigger the block above when successful)
+                    signInAnonymously(auth).catch(error => {
+                        console.error("Anonymous Sign-in Failed:", error);
+                        displayError("Authentication Error", `Could not sign in to Firebase to retrieve the image. Details: ${error.message}`);
+                    });
+                }
+            });
         }
 
         window.onload = initViewer;
