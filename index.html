@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Image Gallery & Viewer</title>
-    <!-- Load Tailwind CSS (Using CDN for simplicity) -->
+    <!-- Load Tailwind CSS (CDN is fine for this environment) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Load Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
@@ -18,7 +18,7 @@
         }
         .container-card {
             background-color: #1f2937; /* Slightly lighter card background */
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.4);
             border: 1px solid #374151;
         }
         .btn-action {
@@ -58,7 +58,14 @@
 <body class="min-h-screen p-4 md:p-8 flex items-start justify-center">
 
     <div id="app-container" class="w-full max-w-6xl container-card rounded-xl p-6 md:p-10 mt-10">
-        <!-- RENDERED CONTENT GOES HERE -->
+        <!-- Initial loading message -->
+        <div id="loading-initial" class="text-center p-8 text-gray-400">
+             <svg class="animate-spin h-8 w-8 text-indigo-400 inline-block mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="mt-2">Initializing application and authenticating...</p>
+        </div>
     </div>
 
     <!-- Hidden file input for selection -->
@@ -83,6 +90,7 @@
         import { getFirestore, doc, getDoc, addDoc, deleteDoc, onSnapshot, collection, query, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- GLOBAL VARIABLES (Provided by Canvas) ---
+        // Fallback IDs are provided in case the variables are somehow undefined, though they shouldn't be.
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-image-bin-app-id';
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
@@ -202,8 +210,8 @@
                         loadImagesFromFirestore();
                     }
                 } else {
-                    // This handles the sign-in attempt if the initialAuthToken was null
-                    console.log("Waiting for anonymous sign-in...");
+                    // This case is unlikely to be hit if sign-in is successful in initApp
+                    console.log("Authentication state not ready yet.");
                 }
             });
         }
@@ -637,12 +645,13 @@
         // --- INITIALIZATION ---
 
         async function initApp() {
+            const loadingInitial = document.getElementById('loading-initial');
             try {
                 // setLogLevel('Debug'); // Uncomment for debugging
                 
-                // CRITICAL FIX: Ensure firebaseConfig has required keys before calling initializeApp
+                // CRITICAL FIX: The check that prevents the Firebase crash
                 if (!firebaseConfig || !firebaseConfig.projectId) {
-                    throw new Error("Missing Firebase configuration. The 'projectId' is required. Please check environment variables.");
+                    throw new Error("Missing Firebase configuration. The 'projectId' is required to connect to the database. Please ensure your environment is correctly configured.");
                 }
 
                 const app = initializeApp(firebaseConfig);
@@ -660,13 +669,16 @@
                 routeApp();
             } catch (error) {
                 console.error("Fatal Error initializing Firebase:", error);
+                // Display the error clearly to the user instead of just crashing
                 appContainer.innerHTML = `
                     <div class="p-8 text-center bg-red-900/30 rounded-xl border border-red-700">
                         <h2 class="text-2xl text-red-400 font-bold mb-3">Initialization Error</h2>
-                        <p class="text-red-300">Could not start the application due to a configuration error.</p>
+                        <p class="text-red-300">The application could not start because it failed to initialize the database.</p>
                         <p class="text-sm text-red-200 mt-2">${error.message}</p>
                     </div>
                 `;
+            } finally {
+                if (loadingInitial) loadingInitial.classList.add('hidden');
             }
         }
 
