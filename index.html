@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Image Uploader & Gallery</title>
-    <!-- Load Tailwind CSS (CDN is fine for this environment) -->
+    <title>Custom Image Resizer Tool</title>
+    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Load Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
@@ -31,117 +31,127 @@
         .btn-primary:hover {
             background-color: #2ea043;
         }
-        .delete-btn {
-            background-color: #da3633; /* GitHub Red */
+        .input-field {
+            background-color: #0d1117;
+            border: 1px solid #30363d;
+            color: #f3f4f6;
+            padding: 10px;
+            border-radius: 8px;
+            transition: border-color 0.2s;
         }
-        .delete-btn:hover {
-            background-color: #f85149;
-        }
-        .link-icon {
-            opacity: 0;
-            transition: opacity 0.2s;
-        }
-        .img-preview-cell:hover .link-icon {
-            opacity: 1;
-        }
-        #gallery-container::-webkit-scrollbar {
-            height: 6px;
-        }
-        #gallery-container::-webkit-scrollbar-thumb {
-            background: #238636;
-            border-radius: 3px;
-        }
-        /* Style for the minimal viewer mode */
-        .viewer-body {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
+        .input-field:focus {
+            border-color: #238636;
+            outline: none;
         }
     </style>
 </head>
 
-<body class="p-0 m-0">
+<body class="min-h-screen p-4 md:p-8 flex items-start justify-center">
 
-    <!-- The main application container for Gallery Mode -->
-    <div id="app-container" class="hidden min-h-screen w-full max-w-6xl container-card rounded-xl p-6 md:p-10 mt-10 mx-auto">
-        <!-- Content will be injected here if in Gallery Mode -->
-    </div>
+    <!-- Main Resizer Container -->
+    <div id="app-container" class="w-full max-w-4xl container-card rounded-xl p-6 md:p-10 mt-10 mx-auto">
+        <div class="text-center mb-10 w-full">
+            <h1 class="text-4xl font-extrabold text-green-400 mb-2">Custom Image Resizer</h1>
+            <p class="text-gray-400">Upload an image, define new dimensions, and download the resized version instantly.</p>
+        </div>
 
-    <!-- Custom Modal for Delete Confirmation -->
-    <div id="delete-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center z-50 p-4">
-        <div class="bg-gray-800 p-6 rounded-xl w-full max-w-sm shadow-2xl border border-red-700">
-            <h3 class="text-xl font-bold text-red-400 mb-4">Confirm Deletion</h3>
-            <p class="text-gray-300 mb-6">Are you sure you want to permanently delete this image? This action cannot be undone.</p>
-            <div class="flex justify-end space-x-4">
-                <button id="cancel-delete" class="px-4 py-2 text-gray-300 bg-gray-600 rounded-lg hover:bg-gray-500 transition">Cancel</button>
-                <button id="confirm-delete" class="px-4 py-2 text-white bg-red-600 rounded-lg hover:bg-red-700 transition">Delete</button>
+        <!-- UPLOAD/INPUT SECTION -->
+        <div class="mb-10 p-6 bg-gray-900 rounded-xl border border-gray-700 w-full">
+            
+            <!-- Hidden File Input -->
+            <input type="file" id="file-input" accept="image/*" class="hidden">
+            
+            <!-- Drop Zone / File Selector -->
+            <div id="drop-zone" class="p-8 text-center border-2 border-dashed border-green-500 rounded-xl cursor-pointer hover:bg-gray-800 transition duration-300 mb-6">
+                <svg class="mx-auto h-12 w-12 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v8"></path></svg>
+                <p class="mt-2 text-sm text-gray-300"><span class="font-semibold text-green-400" id="file-name-display">Click to select image</span> or drag and drop</p>
+                <p id="original-size" class="text-xs text-gray-500 mt-1 h-4"></p>
+            </div>
+
+            <!-- Dimension Inputs -->
+            <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mb-6">
+                <div class="flex-1">
+                    <label for="resize-width" class="block text-sm font-medium text-gray-400 mb-1">Target Width (px)</label>
+                    <input type="number" id="resize-width" min="1" placeholder="e.g., 300" class="input-field w-full">
+                </div>
+                <div class="flex-1">
+                    <label for="resize-height" class="block text-sm font-medium text-gray-400 mb-1">Target Height (px)</label>
+                    <input type="number" id="resize-height" min="1" placeholder="e.g., 200" class="input-field w-full">
+                </div>
+            </div>
+
+            <!-- Action Button -->
+            <button id="resize-btn" class="btn-action btn-primary w-full py-3 text-white font-semibold rounded-lg disabled:opacity-50" disabled>
+                <i class="fas fa-magic mr-2"></i> Resize Image
+            </button>
+            <p id="status-message" class="text-center mt-3 text-sm text-yellow-400 h-4"></p>
+        </div>
+
+        <!-- RESULT SECTION -->
+        <div id="result-area" class="mt-12 w-full hidden">
+            <h2 class="text-2xl font-bold text-gray-200 mb-4 border-b border-green-500 pb-2">Resized Image Result</h2>
+            
+            <div class="flex flex-col md:flex-row bg-gray-800 rounded-xl overflow-hidden border border-gray-700">
+                
+                <!-- Preview Area -->
+                <div class="md:w-1/2 p-4 flex items-center justify-center bg-gray-900">
+                    <img id="image-preview" src="" alt="Resized Image Preview" class="max-w-full max-h-[40vh] object-contain rounded-md shadow-lg border border-gray-700 transition duration-300">
+                </div>
+
+                <!-- Info and Download -->
+                <div class="md:w-1/2 p-6 flex flex-col justify-center space-y-4">
+                    <h3 class="text-xl font-bold text-green-400">Ready for Download!</h3>
+                    
+                    <div class="space-y-2">
+                        <p class="text-gray-400 font-medium">New Dimensions:</p>
+                        <p id="result-dimensions" class="text-white text-lg font-mono px-3 py-1 bg-gray-700 rounded-lg inline-block"></p>
+                    </div>
+
+                    <div class="space-y-2">
+                        <p class="text-gray-400 font-medium">Estimated File Size:</p>
+                        <p id="result-size" class="text-white text-lg font-mono px-3 py-1 bg-gray-700 rounded-lg inline-block"></p>
+                    </div>
+
+                    <a id="download-link" download="resized_image.png" 
+                       class="btn-action bg-yellow-600 hover:bg-yellow-500 text-gray-900 font-bold py-3 px-4 rounded-lg text-center cursor-pointer mt-4 shadow-md">
+                        <i class="fas fa-download mr-2"></i> Download Image
+                    </a>
+                </div>
             </div>
         </div>
     </div>
 
-    <script type="module">
-        // --- FIREBASE IMPORTS ---
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, addDoc, deleteDoc, onSnapshot, collection, query, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    <!-- Notification Container (for errors/success) -->
+    <div id="notification-container"></div>
 
-        // --- HARDCODED FALLBACK CONFIG (Guaranteed connection) ---
-        const FALLBACK_FIREBASE_CONFIG = {
-            apiKey: "AIzaSyBJELImxh2a5nx85UCHIxHgiD-H-v8LsxE",
-            authDomain: "image-uploader-46f04.firebaseapp.com",
-            projectId: "image-uploader-46f04",
-            storageBucket: "image-uploader-46f04.firebasestorage.app",
-            messagingSenderId: "1046392282951",
-            appId: "1:1046392282951:web:ca8e9e14d6281f03bef662",
-            measurementId: "G-WX74X0NEGK"
-        };
-        
-        // --- GLOBAL VARIABLES (Provided by Canvas, with fallbacks) ---
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'image-uploader-46f04';
-
-        let globalConfig;
-        try {
-            globalConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        } catch (e) {
-            globalConfig = {};
-        }
-        
-        const firebaseConfig = (globalConfig && globalConfig.projectId) ? globalConfig : FALLBACK_FIREBASE_CONFIG;
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
+    <script>
         // --- GLOBAL STATE ---
-        let db = null;
-        let auth = null;
-        let currentUserId = null;
         let selectedFile = null; 
-        const MAX_FILE_SIZE_BYTES = 1000 * 1024; // ~1MB limit for Firestore Base64 encoding
-        const MAX_IMAGE_DIMENSION = 1200; // Max width or height for resizing
 
         // --- DOM Elements ---
-        const appContainer = document.getElementById('app-container');
         const fileInput = document.getElementById('file-input');
-        const deleteModal = document.getElementById('delete-modal');
-        const confirmDeleteBtn = document.getElementById('confirm-delete');
-        const cancelDeleteBtn = document.getElementById('cancel-delete');
-        let imageToDeleteId = null;
+        const dropZone = document.getElementById('drop-zone');
+        const fileNameDisplay = document.getElementById('file-name-display');
+        const originalSizeDisplay = document.getElementById('original-size');
+        const widthInput = document.getElementById('resize-width');
+        const heightInput = document.getElementById('resize-height');
+        const resizeBtn = document.getElementById('resize-btn');
+        const statusMessage = document.getElementById('status-message');
+        const resultArea = document.getElementById('result-area');
+        const imagePreview = document.getElementById('image-preview');
+        const downloadLink = document.getElementById('download-link');
+        const resultDimensions = document.getElementById('result-dimensions');
+        const resultSize = document.getElementById('result-size');
 
-        // --- PATHS ---
-        const projectIdUsed = firebaseConfig.projectId || appId;
-        const PUBLIC_COLLECTION_PATH = `artifacts/${projectIdUsed}/public/data/images`;
-
-        // --- UTILITIES (Unchanged) ---
-        function getAbsoluteShareUrl(imageId) {
-            const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
-            return `${baseUrl}index.html?id=${imageId}`;
-        }
+        // --- UTILITIES ---
         
+        /** Shows a temporary notification message. */
         function showNotification(message, isError = false) {
+            const container = document.getElementById('notification-container');
             const notification = document.createElement('div');
             notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-xl text-white font-semibold transform transition-transform duration-300 ${isError ? 'bg-red-600' : 'bg-green-600'}`;
             notification.textContent = message;
-            document.body.appendChild(notification);
+            container.appendChild(notification);
             
             setTimeout(() => {
                 notification.style.transform = 'translateX(120%)';
@@ -149,511 +159,180 @@
             }, 3000);
         }
 
-        function copyToClipboard(text, successMessage) {
-            try {
-                const el = document.createElement('textarea');
-                el.value = text;
-                document.body.appendChild(el);
-                el.select();
-                document.execCommand('copy');
-                document.body.removeChild(el);
-                showNotification(successMessage);
-            } catch (err) {
-                console.error('Could not copy text: ', err);
-                showNotification('Error: Failed to copy link to clipboard.', true);
-            }
+        /** Converts base64 to estimated size (KB) */
+        function getBase64SizeKb(base64Data) {
+            const sizeMatch = base64Data.match(/^data:image\/\w+;base64,(.*)/);
+            const base64Content = sizeMatch ? sizeMatch[1] : '';
+            // Size estimation for base64
+            return Math.ceil((base64Content.length * 3) / 4 / 1024).toLocaleString();
         }
-        
-        function resizeImage(file) {
-            return new Promise((resolve) => {
+
+        /** Core image resizing function using HTML Canvas. */
+        function resizeImage(file, targetWidth, targetHeight) {
+            return new Promise((resolve, reject) => {
+                if (targetWidth <= 0 || targetHeight <= 0) {
+                    return reject(new Error("Target dimensions must be positive integers."));
+                }
+
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const img = new Image();
                     img.onload = () => {
-                        let width = img.width;
-                        let height = img.height;
-
-                        if (width > height) {
-                            if (width > MAX_IMAGE_DIMENSION) {
-                                height *= MAX_IMAGE_DIMENSION / width;
-                                width = MAX_IMAGE_DIMENSION;
-                            }
-                        } else {
-                            if (height > MAX_IMAGE_DIMENSION) {
-                                width *= MAX_IMAGE_DIMENSION / height;
-                                height = MAX_IMAGE_DIMENSION;
-                            }
-                        }
-
                         const canvas = document.createElement('canvas');
-                        canvas.width = width;
-                        canvas.height = height;
+                        canvas.width = targetWidth;
+                        canvas.height = targetHeight;
                         const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        // Draw the image onto the canvas, fitting it exactly to the target dimensions
+                        // This might distort the aspect ratio.
+                        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
 
-                        const resizedBase64 = canvas.toDataURL('image/jpeg', 0.8);
-                        resolve(resizedBase64);
+                        // Output as PNG for quality, or use original mimeType if known
+                        const mimeType = file.type === 'image/jpeg' ? 'image/jpeg' : 'image/png';
+
+                        const resizedBase64 = canvas.toDataURL(mimeType, 0.9); 
+                        resolve({ 
+                            base64Data: resizedBase64, 
+                            width: targetWidth, 
+                            height: targetHeight,
+                            mimeType: mimeType,
+                            fileName: file.name
+                        });
                     };
+                    img.onerror = () => reject(new Error("Could not load image file for resizing."));
                     img.src = e.target.result;
                 };
+                reader.onerror = () => reject(new Error("Could not read file."));
                 reader.readAsDataURL(file);
             });
         }
+
+        // --- EVENT HANDLERS ---
         
-        // --- ROUTING / VIEW CONTROLLER (Modified) ---
-        
-        /** Determines which UI to show based on URL parameters. */
-        function routeApp() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const imageId = urlParams.get('id');
-
-            // Wait for auth to be ready before routing
-            onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    currentUserId = user.uid;
-                    
-                    if (imageId) {
-                        // Renders a minimal, full-page viewer
-                        renderMinimalViewerPage(imageId);
-                    } else {
-                        // Renders the full gallery/uploader app
-                        renderGalleryView();
-                        loadImagesFromFirestore();
-                    }
-                } else {
-                    console.log("Authentication state not ready/user signed out.");
-                }
-            });
-        }
-        
-        // --- MINIMAL VIEWER MODE (New Functionality) ---
-
-        /** Renders a minimal, full-page view primarily for embedding. */
-        function renderMinimalViewerPage(imageId) {
-            // Remove default body classes and add viewer classes
-            document.body.className = 'viewer-body bg-gray-900'; 
-            appContainer.classList.add('hidden'); // Ensure app container is hidden
-
-            document.body.innerHTML = `
-                <div class="text-center w-full h-full p-4">
-                    <div id="viewer-status" class="text-gray-400">
-                        <svg class="animate-spin h-8 w-8 text-green-400 inline-block mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <p class="mt-2">Fetching image data...</p>
-                    </div>
-                    
-                    <div id="image-display" class="hidden w-full h-full max-w-full max-h-full">
-                        <img id="shared-image" alt="Shared Image" class="block object-contain max-w-full max-h-[90vh] mx-auto rounded-lg shadow-xl" />
-                        <a href="index.html" class="absolute top-4 right-4 text-xs font-semibold py-1 px-3 bg-gray-700/80 rounded-full text-white hover:bg-gray-600 transition">Gallery →</a>
-                    </div>
-
-                    <div id="viewer-error" class="hidden p-8 bg-red-900/30 rounded-xl border border-red-700 text-red-300 max-w-md mx-auto">
-                        <h3 class="font-bold text-lg text-red-400 mb-2">Error Loading Image</h3>
-                        <p id="error-message-detail"></p>
-                    </div>
-                </div>
-            `;
-            fetchImageForMinimalViewer(imageId);
-        }
-
-        /** Fetches and displays a single image in the minimal viewer mode. */
-        async function fetchImageForMinimalViewer(imageId) {
-            const statusEl = document.getElementById('viewer-status');
-            const imageDisplayEl = document.getElementById('image-display');
-            const sharedImageEl = document.getElementById('shared-image');
-            const errorEl = document.getElementById('viewer-error');
-            const errorDetailEl = document.getElementById('error-message-detail');
-
-            const displayError = (message) => {
-                statusEl.classList.add('hidden');
-                imageDisplayEl.classList.add('hidden');
-                errorDetailEl.textContent = message;
-                errorEl.classList.remove('hidden');
-            };
-
-            try {
-                if (!db) throw new Error("Database not initialized."); 
-                
-                const imageRef = doc(db, PUBLIC_COLLECTION_PATH, imageId);
-                const docSnap = await getDoc(imageRef);
-
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    
-                    // Display the image
-                    sharedImageEl.src = data.base64Data;
-                    sharedImageEl.alt = data.fileName;
-                    
-                    // Show the image and hide loading/error
-                    statusEl.classList.add('hidden');
-                    imageDisplayEl.classList.remove('hidden');
-
-                } else {
-                    displayError(`The image with ID: "${imageId}" was not found or has been deleted.`);
-                }
-                
-            } catch (error) {
-                console.error("Image Fetch Error:", error);
-                displayError(`Failed to retrieve data: ${error.message}.`);
-            }
-        }
-        
-        // --- GALLERY VIEW RENDERING (Unchanged) ---
-        function renderGalleryView() {
-            // Set body classes for Gallery Mode
-            document.body.className = 'min-h-screen p-4 md:p-8 flex items-start justify-center';
-            appContainer.classList.remove('hidden');
-
-            appContainer.innerHTML = `
-                <div class="text-center mb-10 w-full">
-                    <h1 class="text-4xl font-extrabold text-green-400 mb-2">Secure Image Uploader & Gallery</h1>
-                    <p class="text-gray-400">Share images instantly! Your unique ID: <span class="font-mono text-xs text-yellow-400">${currentUserId}</span></p>
-                </div>
-
-                <!-- UPLOAD SECTION -->
-                <div class="mb-10 p-6 bg-gray-900 rounded-xl border border-gray-700 w-full">
-                    <h2 class="text-2xl font-bold text-gray-200 mb-4">Upload New Image</h2>
-                    <div id="drop-zone" class="p-8 text-center border-2 border-dashed border-green-500 rounded-xl cursor-pointer hover:bg-gray-800 transition duration-300">
-                        <svg class="mx-auto h-12 w-12 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v8"></path></svg>
-                        <p class="mt-2 text-sm text-gray-300"><span class="font-semibold text-green-400">Click to select image</span> or drag and drop</p>
-                        <p class="text-xs text-gray-500 mt-1">Files over 1MB will be resized automatically (max dimension ${MAX_IMAGE_DIMENSION}px).</p>
-                    </div>
-                    
-                    <div id="upload-status-area" class="mt-4 hidden p-4 bg-gray-700 rounded-lg">
-                        <p id="file-name-display" class="text-gray-300 font-medium truncate"></p>
-                        <div id="upload-message" class="mt-2 text-sm text-yellow-300"></div>
-                        <div class="flex mt-4 space-x-4">
-                            <button id="upload-btn" class="btn-action btn-primary flex-1 py-2 text-white font-semibold rounded-lg disabled:opacity-50" disabled>
-                                <i class="fas fa-cloud-upload-alt mr-2"></i> Upload & Get Link
-                            </button>
-                            <button id="clear-btn" class="btn-action bg-gray-600 hover:bg-gray-500 py-2 px-4 text-white font-semibold rounded-lg">
-                                <i class="fas fa-times"></i> Clear
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- IMAGE TABLE -->
-                <div class="mt-12 w-full">
-                    <h2 class="text-2xl font-bold text-gray-200 mb-4 border-b border-green-500 pb-2">Image History</h2>
-                    <p id="loading-status" class="text-gray-400 text-center p-4">Fetching history from Firestore...</p>
-                    <div id="gallery-container" class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-700 rounded-xl overflow-hidden shadow-lg hidden" id="image-table">
-                            <thead class="bg-gray-700/70">
-                                <tr>
-                                    <th class="px-3 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Preview</th>
-                                    <th class="px-3 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Name</th>
-                                    <th class="px-3 py-3 text-left text-xs font-medium text-white uppercase tracking-wider hidden md:table-cell">Size</th>
-                                    <th class="px-3 py-3 text-left text-xs font-medium text-white uppercase tracking-wider hidden md:table-cell">Owner</th>
-                                    <th class="px-3 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Uploaded At</th>
-                                    <th class="px-3 py-3 text-center text-xs font-medium text-white uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-gray-800 divide-y divide-gray-700" id="image-table-body">
-                                <!-- Rows inserted here by loadImagesFromFirestore -->
-                            </tbody>
-                        </table>
-                        <p id="empty-message" class="text-gray-500 text-center p-4 bg-gray-800 rounded-lg hidden">No images uploaded yet. Use the form above to get started!</p>
-                    </div>
-                </div>
-            `;
-            // Hide the initial loading message if it was shown
-            document.getElementById('loading-initial')?.remove();
-
-            // Attach gallery event listeners after rendering
-            attachGalleryListeners();
-        }
-
-        /** Renders a single row in the image history table. */
-        function renderImageRow(image) {
-            const isOwner = image.ownerId === currentUserId;
-            const ownerDisplay = isOwner 
-                ? `<span class="text-green-400 font-bold">You</span>`
-                : `<span class="text-gray-400">${image.ownerId.substring(0, 8)}...</span>`;
-                
-            const sizeDisplay = (image.size / 1024).toFixed(2) + ' KB';
-            const absoluteLink = getAbsoluteShareUrl(image.id);
-
-            return `
-                <tr data-id="${image.id}" class="hover:bg-gray-700 transition duration-150 relative">
-                    <td class="img-preview-cell px-3 py-3">
-                        <div class="relative w-12 h-12">
-                            <img src="${image.base64Data}" alt="Thumbnail" class="w-full h-full object-cover rounded-md border border-gray-600">
-                            <!-- Link Icon Overlay -->
-                            <button onclick="event.stopPropagation(); copyToClipboard('${absoluteLink}', 'Embeddable Share URL copied!');"
-                                    class="link-icon absolute inset-0 flex items-center justify-center bg-black bg-opacity-60 rounded-md text-green-400 hover:text-white transition duration-200">
-                                <i class="fas fa-link text-lg"></i>
-                            </button>
-                        </div>
-                    </td>
-                    <td class="px-3 py-3 text-sm font-medium text-gray-300 truncate max-w-[150px]">${image.fileName}</td>
-                    <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-400 hidden md:table-cell">${sizeDisplay}</td>
-                    <td class="px-3 py-3 whitespace-nowrap text-sm hidden md:table-cell">${ownerDisplay}</td>
-                    <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-500">${image.timestamp}</td>
-                    <td class="px-3 py-3 text-center whitespace-nowrap">
-                        <div class="flex space-x-2 justify-center">
-                            <!-- View Button (Always visible, opens in new tab) -->
-                            <a href="${absoluteLink}" target="_blank" class="btn-action p-2 text-sm font-semibold rounded-lg bg-gray-600 hover:bg-gray-500 text-white transition duration-150 shadow-md">
-                                <i class="fas fa-eye"></i> View
-                            </a>
-                            <!-- Delete Button (Only visible for owner) -->
-                            ${isOwner ? 
-                                `<button data-id="${image.id}" class="delete-btn flex items-center justify-center space-x-1 p-2 text-sm font-semibold rounded-lg text-white transition duration-150 shadow-md">
-                                    <i class="fas fa-trash-alt"></i> Delete
-                                </button>` : ''
-                            }
-                        </div>
-                    </td>
-                </tr>
-            `;
-        }
-
-
-        // --- FIREBASE DATA LOGIC (Unchanged) ---
-        function loadImagesFromFirestore() {
-            if (!db) return;
-
-            const loadingStatus = document.getElementById('loading-status');
-            const imageTable = document.getElementById('image-table');
-            const imageTableBody = document.getElementById('image-table-body');
-            const emptyMessage = document.getElementById('empty-message');
-            
-            const imagesRef = collection(db, PUBLIC_COLLECTION_PATH);
-            const q = imagesRef; 
-
-            if (loadingStatus) loadingStatus.textContent = 'Loading history...';
-
-            onSnapshot(q, (snapshot) => {
-                const uploadedFiles = [];
-                snapshot.forEach((doc) => {
-                    const data = doc.data();
-                    const timestamp = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleString() : 'N/A';
-                    uploadedFiles.push({
-                        id: doc.id,
-                        fileName: data.fileName,
-                        base64Data: data.base64Data,
-                        size: data.size, 
-                        timestamp: timestamp,
-                        ownerId: data.ownerId 
-                    });
-                });
-                
-                uploadedFiles.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-                
-                imageTableBody.innerHTML = uploadedFiles.map(image => renderImageRow(image)).join('');
-
-                if (uploadedFiles.length > 0) {
-                    imageTable.classList.remove('hidden');
-                    if (loadingStatus) loadingStatus.classList.add('hidden');
-                    emptyMessage.classList.add('hidden');
-                } else {
-                    imageTable.classList.add('hidden');
-                    emptyMessage.classList.remove('hidden');
-                }
-
-            }, (error) => {
-                console.error("Error listening to Firestore:", error);
-                if (loadingStatus) loadingStatus.textContent = "Error fetching history: Data sync failed.";
-            });
-        }
-
-        async function saveImageToFirestore(name, base64Data) {
-            if (!db || !currentUserId) {
-                showNotification('Database not ready. Please wait.', true);
-                return;
-            }
-
-            const uploadBtn = document.getElementById('upload-btn');
-            uploadBtn.disabled = true;
-
-            const sizeMatch = base64Data.match(/^data:image\/\w+;base64,(.*)/);
-            const base64Content = sizeMatch ? sizeMatch[1] : '';
-            const sizeInBytes = Math.ceil((base64Content.length * 3) / 4); 
-
-            try {
-                const docRef = await addDoc(collection(db, PUBLIC_COLLECTION_PATH), {
-                    fileName: name,
-                    base64Data: base64Data, 
-                    size: sizeInBytes,
-                    timestamp: serverTimestamp(),
-                    ownerId: currentUserId 
-                });
-                showNotification(`Image "${name}" uploaded! Link generated: ${getAbsoluteShareUrl(docRef.id)}`);
-                
-                handleClear();
-            } catch (error) {
-                console.error("Error writing document:", error);
-                showNotification(`Upload failed: ${error.message}`, true);
-            } finally {
-                uploadBtn.disabled = false;
-            }
-        }
-        
-        async function deleteImageFromFirestore(imageId) {
-            if (!db || !currentUserId) {
-                showNotification('Authentication required to delete.', true);
-                return;
-            }
-
-            try {
-                const docRef = doc(db, PUBLIC_COLLECTION_PATH, imageId);
-                await deleteDoc(docRef);
-                showNotification(`Image successfully deleted.`);
-            } catch (error) {
-                console.error("Deletion failed:", error);
-                showNotification(`Deletion failed. You can only delete images you uploaded.`, true);
-            }
-        }
-
-        // --- GALLERY EVENT HANDLERS (Unchanged logic, minor cleanup) ---
         function handleClear() {
             selectedFile = null;
-            if (fileInput) fileInput.value = '';
-            const uploadStatusArea = document.getElementById('upload-status-area');
-            if (uploadStatusArea) uploadStatusArea.classList.add('hidden');
+            fileInput.value = '';
+            fileNameDisplay.textContent = 'Click to select image';
+            originalSizeDisplay.textContent = '';
+            resizeBtn.disabled = true;
+            resultArea.classList.add('hidden');
+            statusMessage.textContent = '';
         }
 
-        function attachGalleryListeners() {
-            const dropZone = document.getElementById('drop-zone');
-            const uploadBtn = document.getElementById('upload-btn');
-            const clearBtn = document.getElementById('clear-btn');
-            
-            if (fileInput) fileInput.onchange = (e) => { const file = e.target.files[0]; handleFileSelection(file); };
-            
-            if (dropZone) {
-                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                    dropZone.addEventListener(eventName, preventDefaults, false);
-                });
-                dropZone.addEventListener('drop', (e) => handleDrop(e), false);
-                dropZone.onclick = () => fileInput.click();
-            }
-
-            if (uploadBtn) {
-                uploadBtn.onclick = async () => {
-                    if (selectedFile) {
-                        const base64Data = await processImageForUpload(selectedFile);
-                        if (base64Data) { await saveImageToFirestore(selectedFile.name, base64Data); }
-                    } else { showNotification('Please select an image first.', true); }
-                };
-            }
-            if (clearBtn) clearBtn.onclick = handleClear;
-
-            // Handle table click for deletion
-            document.body.addEventListener('click', (e) => {
-                const target = e.target.closest('.delete-btn');
-                if (target) {
-                    imageToDeleteId = target.getAttribute('data-id');
-                    deleteModal.style.display = 'flex';
-                }
-            });
-            
-            // Modal Listeners
-            if (confirmDeleteBtn) confirmDeleteBtn.onclick = () => { if (imageToDeleteId) { deleteImageFromFirestore(imageToDeleteId); } deleteModal.style.display = 'none'; imageToDeleteId = null; };
-            if (cancelDeleteBtn) cancelDeleteBtn.onclick = () => { deleteModal.style.display = 'none'; imageToDeleteId = null; };
-        }
-        
-        function handleDrop(e) {
-            e.preventDefault();
-            const dt = e.dataTransfer;
-            if (dt.files.length > 0) { handleFileSelection(dt.files[0]); }
-        }
-        
         function handleFileSelection(file) {
-            if (!file || !file.type.startsWith('image/')) { showNotification('Invalid file type. Please select an image.', true); handleClear(); return; }
+            if (!file || !file.type.startsWith('image/')) { 
+                showNotification('Invalid file type. Please select an image.', true); 
+                handleClear(); 
+                return; 
+            }
             selectedFile = file;
             
-            const uploadStatusArea = document.getElementById('upload-status-area');
-            const fileNameDisplay = document.getElementById('file-name-display');
-            const uploadBtn = document.getElementById('upload-btn');
-            const uploadMessage = document.getElementById('upload-message');
+            // Display file info
+            fileNameDisplay.textContent = `Selected: ${file.name}`;
+            originalSizeDisplay.textContent = `Original size: ${(file.size / 1024 / 1024).toFixed(2)} MB`;
             
-            fileNameDisplay.textContent = `Selected: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
-            uploadMessage.textContent = file.size > MAX_FILE_SIZE_BYTES ? 'File is large. It will be resized automatically on upload.' : 'File size is acceptable.';
-            if (uploadStatusArea) uploadStatusArea.classList.remove('hidden');
-            if (uploadBtn) uploadBtn.disabled = false;
+            // Read original dimensions to pre-fill inputs
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    // Pre-fill dimensions with current image size
+                    widthInput.value = img.width;
+                    heightInput.value = img.height;
+                    resizeBtn.disabled = false;
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+            
+            // Clear previous results
+            resultArea.classList.add('hidden');
+            statusMessage.textContent = '';
         }
 
-        async function processImageForUpload(file) {
-            const uploadMessage = document.getElementById('upload-message');
-            const sizeInBytes = file.size;
+        async function handleResize() {
+            if (!selectedFile) {
+                showNotification('Please select an image first.', true);
+                return;
+            }
             
-            if (sizeInBytes > MAX_FILE_SIZE_BYTES) {
-                if (uploadMessage) uploadMessage.textContent = 'Resizing image... Please wait.';
-                const base64Data = await resizeImage(file);
-                const newSizeMatch = base64Data.match(/^data:image\/\w+;base64,(.*)/);
-                const newBase64Content = newSizeMatch ? newSizeMatch[1] : '';
-                const newSizeInBytes = Math.ceil((newBase64Content.length * 3) / 4); 
+            const targetWidth = parseInt(widthInput.value, 10);
+            const targetHeight = parseInt(heightInput.value, 10);
+
+            if (isNaN(targetWidth) || isNaN(targetHeight) || targetWidth <= 0 || targetHeight <= 0) {
+                showNotification('Please enter valid, positive width and height values.', true);
+                return;
+            }
+            
+            resizeBtn.disabled = true;
+            statusMessage.textContent = 'Resizing in progress... Please wait.';
+            resultArea.classList.add('hidden');
+
+            try {
+                const result = await resizeImage(selectedFile, targetWidth, targetHeight);
                 
-                if (newSizeInBytes > MAX_FILE_SIZE_BYTES) {
-                    showNotification(`Resized file is still too large (${(newSizeInBytes / 1024).toFixed(1)} KB). Try a smaller image.`, true);
-                    return null;
-                }
-                if (uploadMessage) uploadMessage.textContent = `Resizing successful! New size: ${(newSizeInBytes / 1024).toFixed(1)} KB.`;
-                return base64Data;
+                // Update UI with results
+                imagePreview.src = result.base64Data;
+                resultDimensions.textContent = `${result.width}px x ${result.height}px`;
+                resultSize.textContent = `${getBase64SizeKb(result.base64Data)} KB`;
                 
-            } else {
-                if (uploadMessage) uploadMessage.textContent = 'Preparing file for upload...';
-                return new Promise(resolve => {
-                    const reader = new FileReader();
-                    reader.onload = (e) => resolve(e.target.result);
-                    reader.readAsDataURL(file);
-                });
+                // Set download link attributes
+                downloadLink.href = result.base64Data;
+                downloadLink.download = `resized_${result.width}x${result.height}_${selectedFile.name.replace(/\.[^/.]+$/, "")}.${result.mimeType.split('/')[1]}`;
+                
+                // Show result area and success message
+                resultArea.classList.remove('hidden');
+                statusMessage.textContent = 'Resize successful!';
+                showNotification('Image resized and ready to download!');
+
+            } catch (error) {
+                statusMessage.textContent = '';
+                console.error("Resize Error:", error);
+                showNotification(`Resize failed: ${error.message}`, true);
+            } finally {
+                resizeBtn.disabled = false;
             }
         }
 
+        // --- DRAG AND DROP HELPERS ---
         function preventDefaults (e) {
             e.preventDefault();
             e.stopPropagation();
         }
 
+        function handleDrop(e) {
+            e.preventDefault();
+            const dt = e.dataTransfer;
+            if (dt.files.length > 0) { handleFileSelection(dt.files[0]); }
+        }
+
         // --- INITIALIZATION ---
+        function initApp() {
+            // Setup File Input Listener
+            fileInput.onchange = (e) => { 
+                const file = e.target.files[0]; 
+                handleFileSelection(file); 
+            };
+            
+            // Setup Resize Button Listener
+            resizeBtn.onclick = handleResize;
 
-        async function initApp() {
-            // Check for image ID parameter immediately before any UI setup
-            const urlParams = new URLSearchParams(window.location.search);
-            const imageId = urlParams.get('id');
+            // Setup Drop Zone Listeners
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, preventDefaults, false);
+            });
+            dropZone.addEventListener('drop', handleDrop, false);
+            dropZone.onclick = () => fileInput.click();
+            
+            // Enable resize button if inputs are changed and a file is selected
+            const checkEnableResize = () => {
+                const width = parseInt(widthInput.value, 10);
+                const height = parseInt(heightInput.value, 10);
+                resizeBtn.disabled = !(selectedFile && width > 0 && height > 0);
+            };
 
-            try {
-                if (!firebaseConfig || !firebaseConfig.projectId) {
-                    throw new Error("Missing 'projectId'. Initialization aborted.");
-                }
-
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-
-                // Authenticate the user (required for both upload and read access)
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-
-                // Route the application based on the URL
-                routeApp();
-            } catch (error) {
-                console.error("Fatal Error initializing Firebase:", error);
-                // If it's a viewer page and initialization fails, display minimal error
-                if (imageId) {
-                    document.body.innerHTML = `<div class="p-8 text-center bg-red-900/30 rounded-xl border border-red-700 text-red-300 m-auto max-w-lg">
-                        <h3 class="font-bold text-lg">Viewer Initialization Failed</h3><p>Could not connect to the database to fetch the image.</p>
-                        <p class="text-sm mt-2">${error.message}</p>
-                    </div>`;
-                    document.body.classList.add('viewer-body');
-                } else {
-                    // Otherwise, show the full error in the main container area
-                    document.body.className = 'min-h-screen p-4 md:p-8 flex items-start justify-center';
-                    document.body.innerHTML = `
-                        <div class="p-8 text-center bg-red-900/30 rounded-xl border border-red-700 w-full max-w-lg container-card mt-10">
-                            <h2 class="text-2xl text-red-400 font-bold mb-3">Application Initialization Error</h2>
-                            <p class="text-red-300">The application could not start because it failed to initialize the database.</p>
-                            <p class="text-sm text-red-200 mt-2">Error details: ${error.message}</p>
-                        </div>
-                    `;
-                }
-            }
+            widthInput.addEventListener('input', checkEnableResize);
+            heightInput.addEventListener('input', checkEnableResize);
         }
 
         window.onload = initApp;
