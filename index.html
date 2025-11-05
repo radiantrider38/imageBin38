@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Custom Image Resizer Tool</title>
+    <title>Custom Image Resizer & Converter</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Load Icons -->
@@ -90,12 +90,12 @@
         }
 
         /* Drop Zone Neon Border & Hover */
-        #drop-zone {
+        #drop-zone, #convert-drop-zone {
             border-color: #555;
             border-radius: 12px;
             transition: background-color 0.3s, border-color 0.3s, box-shadow 0.3s;
         }
-        #drop-zone:hover {
+        #drop-zone:hover, #convert-drop-zone:hover {
             border-color: var(--accent-orange);
             background-color: #333;
             box-shadow: 0 0 15px rgba(255, 153, 0, 0.4);
@@ -127,12 +127,12 @@
         }
         
         /* Icon Colors */
-        #drop-zone svg {
+        #drop-zone svg, #convert-drop-zone svg {
             color: var(--accent-orange);
         }
         
         /* Status message color */
-        #status-message {
+        #status-message, #convert-status-message {
             color: var(--accent-gold);
         }
     </style>
@@ -145,21 +145,29 @@
         <div class="text-center mb-10 w-full">
             <!-- Updated title class for neon glow -->
             <h1 class="text-4xl font-extrabold mb-2 solar-title">Advanced Image Transformer</h1>
-            <p class="text-gray-400">Upload, redefine dimensions, manage file size, and control background appearance.</p>
+            <p class="text-gray-400">Resize, convert, and optimize images with dual, independent tools.</p>
         </div>
 
-        <!-- UPLOAD/INPUT SECTION -->
+        <!-- UPLOAD/INPUT SECTION (RESIZER) -->
         <div class="mb-10 p-6 bg-gray-900/30 rounded-xl border border-gray-700/50 w-full">
             
-            <!-- Hidden File Input -->
+            <h2 class="text-2xl font-bold text-gray-200 mb-4 border-b border-accent-orange pb-2">Image Resizer & Optimizer</h2>
+            
+            <!-- Hidden File Input for Resizer -->
             <input type="file" id="file-input" accept="image/*" class="hidden">
             
-            <!-- Drop Zone / File Selector -->
-            <div id="drop-zone" class="p-8 text-center border-2 border-dashed rounded-xl cursor-pointer mb-6">
+            <!-- Drop Zone / File Selector for Resizer -->
+            <div id="drop-zone" class="p-8 text-center border-2 border-dashed rounded-xl cursor-pointer mb-3">
                 <svg class="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v8"></path></svg>
-                <p class="mt-2 text-sm text-gray-300"><span class="font-semibold text-white" id="file-name-display">Click to select image</span> or drag and drop</p>
+                <p class="mt-2 text-sm text-gray-300"><span class="font-semibold text-white" id="file-name-display">Click to select image for resizing</span> or drag and drop</p>
                 <p id="original-size" class="text-xs text-gray-500 mt-1 h-4"></p>
             </div>
+            
+            <!-- File Type Indicator -->
+            <p class="text-gray-400 mb-6 text-center text-sm">
+                Supported Input Formats: 
+                <span class="text-accent-gold font-bold">PNG, JPEG, JPG, GIF, WebP</span>
+            </p>
 
             <!-- Dimension Inputs -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
@@ -172,34 +180,83 @@
                     <input type="number" id="resize-height" min="1" placeholder="e.g., 200" class="input-field w-full">
                 </div>
             </div>
-            
-            <!-- Background Color Input -->
-            <div class="mb-4">
-                <label for="bg-color" class="block text-sm font-medium text-gray-400 mb-1">Background Fill Color</label>
-                <select id="bg-color" class="input-field w-full">
-                    <option value="transparent">Transparent (Recommended for PNG)</option>
-                    <option value="white">White (#FFFFFF)</option>
-                    <option value="black">Black (#000000)</option>
-                </select>
+
+            <!-- Output Format and Background Color -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label for="output-format" class="block text-sm font-medium text-gray-400 mb-1">Target Output Format</label>
+                    <select id="output-format" class="input-field w-full">
+                        <option value="image/png">PNG (.png) - Supports transparency</option>
+                        <option value="image/jpeg">JPEG (.jpeg/.jpg)</option>
+                        <option value="image/webp">WebP (.webp)</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="bg-color" class="block text-sm font-medium text-gray-400 mb-1">Background Fill Color</label>
+                    <select id="bg-color" class="input-field w-full">
+                        <option value="transparent">Transparent (For PNG/WebP)</option>
+                        <option value="white">White (#FFFFFF)</option>
+                        <option value="black">Black (#000000)</option>
+                    </select>
+                </div>
             </div>
             
             <!-- Max Memory Input -->
             <div class="mb-6">
                 <label for="max-memory-kb" class="block text-sm font-medium text-gray-400 mb-1">Max File Size (KB) - Optional</label>
                 <input type="number" id="max-memory-kb" min="1" placeholder="e.g., 500 (Leave blank for no limit)" class="input-field w-full">
-                <p class="text-xs text-gray-500 mt-1">Note: Limiting file size forces **JPEG** output and fills transparent areas with **White**.</p>
+                <p class="text-xs text-gray-500 mt-1">Note: Limiting file size forces **JPEG** output and automatically sets the background to **White** for maximum compression.</p>
             </div>
 
             <!-- Action Button -->
             <button id="resize-btn" class="btn-action btn-primary w-full py-3 font-semibold disabled:opacity-50" disabled>
-                <i class="fas fa-meteor mr-2"></i> Initiate Transformation
+                <i class="fas fa-meteor mr-2"></i> Initiate Resizing & Transformation
             </button>
             <p id="status-message" class="text-center mt-3 text-sm h-4"></p>
         </div>
+        
+        <!-- FORMAT CONVERTER SECTION (STANDALONE) -->
+        <div class="mb-10 p-6 bg-gray-900/30 rounded-xl border border-gray-700/50 w-full">
+            <h2 class="text-2xl font-bold text-gray-200 mb-4 border-b border-accent-orange pb-2">Standalone Image Format Converter</h2>
+            
+            <!-- Hidden File Input for Converter -->
+            <input type="file" id="convert-file-input" accept="image/*" class="hidden">
+            
+            <!-- Drop Zone / File Selector for Converter -->
+            <div id="convert-drop-zone" class="p-8 text-center border-2 border-dashed rounded-xl cursor-pointer mb-3">
+                <svg class="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v8"></path></svg>
+                <p class="mt-2 text-sm text-gray-300"><span class="font-semibold text-white" id="convert-file-name-display">Click to select image for conversion</span> or drag and drop</p>
+                <p id="convert-original-size" class="text-xs text-gray-500 mt-1 h-4"></p>
+            </div>
+            
+            <p class="text-gray-400 mb-6 text-center text-sm">Upload a file above to change its format without changing dimensions.</p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                <div>
+                    <label for="target-format" class="block text-sm font-medium text-gray-400 mb-1">Target Format</label>
+                    <select id="target-format" class="input-field w-full">
+                        <option value="image/jpeg">JPEG (.jpeg/.jpg)</option>
+                        <option value="image/png">PNG (.png) - Supports transparency</option>
+                        <option value="image/webp">WebP (.webp) - Modern compression</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="conversion-quality" class="block text-sm font-medium text-gray-400 mb-1">JPEG/WebP Quality (1-100)</label>
+                    <input type="number" id="conversion-quality" min="1" max="100" value="90" placeholder="90" class="input-field w-full">
+                    <p class="text-xs text-gray-500 mt-1">Lower quality = smaller file size (ignored for PNG).</p>
+                </div>
+            </div>
+
+            <button id="convert-btn" class="btn-action btn-primary w-full py-3 font-semibold disabled:opacity-50" disabled>
+                <i class="fas fa-sync-alt mr-2"></i> Convert Format Only
+            </button>
+            <p id="convert-status-message" class="text-center mt-3 text-sm h-4"></p>
+        </div>
+
 
         <!-- RESULT SECTION -->
         <div id="result-area" class="mt-12 w-full hidden">
-            <h2 class="text-2xl font-bold text-gray-200 mb-4 border-b border-accent-orange pb-2">Resized Image Result</h2>
+            <h2 class="text-2xl font-bold text-gray-200 mb-4 border-b border-accent-orange pb-2">Result Preview</h2>
             
             <div class="flex flex-col md:flex-row bg-gray-800/30 rounded-xl overflow-hidden border border-gray-700/50">
                 
@@ -222,7 +279,7 @@
                         <p id="result-size" class="text-white text-lg font-mono px-3 py-1 bg-gray-700/50 rounded-lg inline-block"></p>
                     </div>
 
-                    <a id="download-link" download="resized_image.png" 
+                    <a id="download-link" download="transformed_image.png" 
                        class="btn-action bg-green-600 hover:bg-green-500 text-gray-900 font-bold py-3 px-4 rounded-lg text-center cursor-pointer mt-4 shadow-md">
                         <i class="fas fa-download mr-2"></i> Download Image
                     </a>
@@ -236,9 +293,12 @@
 
     <script>
         // --- GLOBAL STATE ---
-        let selectedFile = null; 
+        let resizeSelectedFile = null; // File for the Resizer section
+        let convertSelectedFile = null; // File for the Converter section
+        let originalImageDimensions = { width: 0, height: 0 };
 
         // --- DOM Elements ---
+        // Resizer Elements
         const fileInput = document.getElementById('file-input');
         const dropZone = document.getElementById('drop-zone');
         const fileNameDisplay = document.getElementById('file-name-display');
@@ -247,8 +307,21 @@
         const heightInput = document.getElementById('resize-height');
         const maxKbInput = document.getElementById('max-memory-kb'); 
         const bgColorInput = document.getElementById('bg-color'); 
+        const outputFormatInput = document.getElementById('output-format'); 
         const resizeBtn = document.getElementById('resize-btn');
         const statusMessage = document.getElementById('status-message');
+        
+        // Converter Elements
+        const convertFileInput = document.getElementById('convert-file-input');
+        const convertDropZone = document.getElementById('convert-drop-zone');
+        const convertFileNameDisplay = document.getElementById('convert-file-name-display');
+        const convertOriginalSizeDisplay = document.getElementById('convert-original-size');
+        const targetFormatInput = document.getElementById('target-format');
+        const conversionQualityInput = document.getElementById('conversion-quality');
+        const convertBtn = document.getElementById('convert-btn');
+        const convertStatusMessage = document.getElementById('convert-status-message');
+
+        // Result Elements (shared)
         const resultArea = document.getElementById('result-area');
         const imagePreview = document.getElementById('image-preview');
         const downloadLink = document.getElementById('download-link');
@@ -275,20 +348,82 @@
         /** Converts base64 to estimated size (KB) */
         function getBase64SizeKb(base64Data) {
             const base64Content = base64Data.split(',')[1] || '';
-            return Math.ceil((base64Content.length * 0.75) / 1024).toLocaleString();
+            // 0.75 factor accounts for base64 encoding overhead
+            return Math.ceil((base64Content.length * 0.75) / 1024); 
         }
 
-        /** Core image resizing and compression function using HTML Canvas. */
-        function resizeImage(file, targetWidth, targetHeight, maxKb, bgColor) { 
+        /** Updates the result section with the processed image data. */
+        function updateResult(base64Data, width, height, mimeType, originalFileName, quality = 1.0) {
+            const finalSizeKbNum = getBase64SizeKb(base64Data);
+            
+            // Update UI with results
+            imagePreview.src = base64Data;
+            
+            let dimText = `${width}px x ${height}px`;
+            if (quality < 1.0) {
+                dimText += ` (Quality: ${Math.round(quality * 100)}%)`;
+            }
+            resultDimensions.textContent = dimText;
+            resultSize.textContent = `${finalSizeKbNum.toLocaleString()} KB`;
+
+            // Set download link attributes
+            downloadLink.href = base64Data;
+            
+            let extension = 'dat'; 
+            switch (mimeType) {
+                case 'image/jpeg': extension = 'jpg'; break;
+                case 'image/png': extension = 'png'; break;
+                case 'image/webp': extension = 'webp'; break;
+            }
+            
+            const cleanName = originalFileName.replace(/\.[^/.]+$/, "");
+            downloadLink.download = `${cleanName}_transformed_${finalSizeKbNum}kb.${extension}`;
+            
+            // Show result area
+            resultArea.classList.remove('hidden');
+        }
+
+        // --- CORE LOGIC ---
+        
+        /** Checks state and enables/disables the action buttons. */
+        const checkEnableButtons = () => {
+            const width = parseInt(widthInput.value, 10);
+            const height = parseInt(heightInput.value, 10);
+            
+            // Resizer requires file and valid positive dimensions
+            resizeBtn.disabled = !(resizeSelectedFile && width > 0 && height > 0);
+            
+            // Converter only requires a file to be selected in its zone
+            convertBtn.disabled = !convertSelectedFile;
+        };
+        
+        /** Handles clearing the file info/state for a specific section. */
+        function clearSection(isConverter) {
+            if (isConverter) {
+                convertSelectedFile = null;
+                convertFileInput.value = '';
+                convertFileNameDisplay.textContent = 'Click to select image for conversion';
+                convertOriginalSizeDisplay.textContent = '';
+            } else {
+                resizeSelectedFile = null;
+                fileInput.value = '';
+                fileNameDisplay.textContent = 'Click to select image for resizing';
+                originalSizeDisplay.textContent = '';
+                // Also reset dimensions only if resizing section is cleared
+                widthInput.value = '';
+                heightInput.value = '';
+                maxKbInput.value = '';
+            }
+            checkEnableButtons();
+        }
+
+        /** Core image resizing and compression function. */
+        function resizeImage(file, targetWidth, targetHeight, maxKb, bgColor, selectedOutputFormat) { 
             return new Promise((resolve, reject) => {
                 if (targetWidth <= 0 || targetHeight <= 0) {
                     return reject(new Error("Target dimensions must be positive integers."));
                 }
                 
-                // Determine output MIME type: forces JPEG if compression is needed or a solid color fill is required
-                const shouldForceJpeg = maxKb > 0 || bgColor !== 'transparent';
-                const outputMimeType = shouldForceJpeg ? 'image/jpeg' : (file.type === 'image/jpeg' ? 'image/jpeg' : 'image/png');
-
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const img = new Image();
@@ -298,41 +433,45 @@
                         canvas.height = targetHeight;
                         const ctx = canvas.getContext('2d');
                         
-                        // Background Color Fill Logic
+                        // Determine output MIME type
+                        let outputMimeType = selectedOutputFormat; 
                         let actualBgColor = bgColor;
-                        if (bgColor === 'transparent' && outputMimeType === 'image/jpeg') {
-                            // JPEGs cannot be transparent, default to white if transparent was selected
-                            actualBgColor = 'white';
-                        }
 
+                        // 1. Max KB limit always forces JPEG output (for reliable compression)
+                        if (maxKb > 0) {
+                            outputMimeType = 'image/jpeg';
+                            actualBgColor = 'white'; 
+                        } 
+                        // 2. If the user selected JPEG, transparency is impossible, so force white fill
+                        else if (outputMimeType === 'image/jpeg' && bgColor === 'transparent') {
+                             actualBgColor = 'white';
+                        }
+                        
+                        // Fill background if not transparent
                         if (actualBgColor !== 'transparent') {
                             ctx.fillStyle = actualBgColor === 'white' ? '#FFFFFF' : '#000000';
                             ctx.fillRect(0, 0, canvas.width, canvas.height);
                         }
 
-                        // Draw the image onto the canvas, fitting it exactly to the target dimensions
+                        // Draw the image onto the canvas, fitting it exactly
                         ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
 
-                        let quality = 0.9; // Start at near-perfect quality
+                        let quality = 0.9; 
                         let resizedBase64 = canvas.toDataURL(outputMimeType, quality);
                         
-                        let currentSizeKbNum = parseFloat(getBase64SizeKb(resizedBase64).replace(/,/g, ''));
+                        let currentSizeKbNum = getBase64SizeKb(resizedBase64);
                         let finalQuality = quality;
 
-                        // Iteratively reduce quality if maxKb is set AND we are outputting JPEG (for compression)
+                        // Iteratively reduce quality if maxKb is set AND output is JPEG
                         if (maxKb > 0 && outputMimeType === 'image/jpeg') {
                             const maxKbNum = parseFloat(maxKb);
                             
                             while (currentSizeKbNum > maxKbNum && finalQuality > 0.1) {
-                                finalQuality = Math.max(0.1, finalQuality - 0.05); // Drop quality by 5%, minimum 0.1
-                                
-                                // Recalculate size with new quality
+                                finalQuality = Math.max(0.1, finalQuality - 0.05); 
                                 resizedBase64 = canvas.toDataURL(outputMimeType, finalQuality);
-                                currentSizeKbNum = parseFloat(getBase64SizeKb(resizedBase64).replace(/,/g, ''));
+                                currentSizeKbNum = getBase64SizeKb(resizedBase64);
                                 
-                                if (finalQuality === 0.1 && currentSizeKbNum > maxKbNum) {
-                                    break;
-                                }
+                                if (finalQuality === 0.1 && currentSizeKbNum > maxKbNum) { break; }
                             }
                         }
 
@@ -353,61 +492,106 @@
                 reader.readAsDataURL(file);
             });
         }
+        
+        /** Core image format conversion function (no resizing). */
+        function convertImage(file, targetMimeType, qualityValue) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        
+                        // Set white background for JPEG conversion if original was transparent
+                        if (targetMimeType === 'image/jpeg') {
+                            ctx.fillStyle = '#FFFFFF';
+                            ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        }
+
+                        ctx.drawImage(img, 0, 0, img.width, img.height);
+                        
+                        const quality = qualityValue / 100;
+                        const convertedBase64 = canvas.toDataURL(targetMimeType, quality);
+                        const finalSizeKbNum = getBase64SizeKb(convertedBase64);
+
+                        resolve({ 
+                            base64Data: convertedBase64, 
+                            width: img.width, 
+                            height: img.height,
+                            mimeType: targetMimeType,
+                            fileName: file.name,
+                            compressionQuality: quality,
+                            finalSizeKb: finalSizeKbNum
+                        });
+                    };
+                    img.onerror = () => reject(new Error("Could not decode image for conversion."));
+                    img.src = e.target.result;
+                };
+                reader.onerror = () => reject(new Error("Could not read file data for conversion."));
+                reader.readAsDataURL(file);
+            });
+        }
 
         // --- EVENT HANDLERS ---
         
-        function handleClear() {
-            selectedFile = null;
-            fileInput.value = '';
-            fileNameDisplay.textContent = 'Click to select image';
-            originalSizeDisplay.textContent = '';
-            resizeBtn.disabled = true;
-            resultArea.classList.add('hidden');
-            statusMessage.textContent = '';
-        }
-
-        function handleFileSelection(file) {
+        /** Handles file selection for either the Resizer (isConverter=false) or Converter (isConverter=true). */
+        function handleFileSelection(file, isConverter = false) {
             if (!file || !file.type.startsWith('image/')) { 
-                showNotification('Invalid file type. Please select an valid image file (JPEG, PNG, GIF).', true); 
-                handleClear(); 
+                showNotification('Invalid file type. Please select an valid image file.', true); 
+                clearSection(isConverter);
                 return; 
             }
-            selectedFile = file;
+            
+            // Set correct state variables and display elements based on tool
+            const stateFileVar = isConverter ? 'convertSelectedFile' : 'resizeSelectedFile';
+            const nameDisplay = isConverter ? convertFileNameDisplay : fileNameDisplay;
+            const sizeDisplay = isConverter ? convertOriginalSizeDisplay : originalSizeDisplay;
+            
+            window[stateFileVar] = file;
             
             // Display file info
-            fileNameDisplay.textContent = `Selected: ${file.name}`;
-            originalSizeDisplay.textContent = `Original size: ${(file.size / 1024 / 1024).toFixed(2)} MB`;
+            nameDisplay.textContent = `Selected: ${file.name}`;
+            sizeDisplay.textContent = `Original size: ${(file.size / 1024 / 1024).toFixed(2)} MB`;
             
-            // Read original dimensions to pre-fill inputs
+            // Read original dimensions to pre-fill inputs (only done for Resizer for utility)
             const reader = new FileReader();
             reader.onload = (e) => {
                 const img = new Image();
                 img.onload = () => {
-                    // Pre-fill dimensions with current image size
-                    widthInput.value = img.width;
-                    heightInput.value = img.height;
-                    resizeBtn.disabled = false;
+                    // Update dimensions only for the Resizer side when selected there
+                    if (!isConverter) {
+                        originalImageDimensions.width = img.width;
+                        originalImageDimensions.height = img.height;
+                        widthInput.value = img.width;
+                        heightInput.value = img.height;
+                    }
+                    // Call checkEnableButtons only after image dimensions are loaded/set
+                    checkEnableButtons(); 
                 };
                 img.onerror = () => {
                     showNotification('Could not decode image data for dimensions. File may be corrupted or too large.', true);
-                    handleClear();
+                    clearSection(isConverter);
                 };
                 img.src = e.target.result;
             };
             reader.onerror = () => {
                 showNotification('Error reading selected file. Please try a smaller file.', true);
-                handleClear();
+                clearSection(isConverter);
             };
             reader.readAsDataURL(file);
             
             // Clear previous results
             resultArea.classList.add('hidden');
             statusMessage.textContent = '';
+            convertStatusMessage.textContent = '';
         }
 
         async function handleResize() {
-            if (!selectedFile) {
-                showNotification('Please select an image first.', true);
+            if (!resizeSelectedFile) { 
+                showNotification('Please select an image in the Resizer section first.', true);
                 return;
             }
             
@@ -415,104 +599,155 @@
             const targetHeight = parseInt(heightInput.value, 10);
             const maxKb = parseInt(maxKbInput.value, 10) || 0; 
             const bgColor = bgColorInput.value; 
+            const selectedOutputFormat = outputFormatInput.value; 
 
             if (isNaN(targetWidth) || isNaN(targetHeight) || targetWidth <= 0 || targetHeight <= 0) {
                 showNotification('Please enter valid, positive width and height values.', true);
                 return;
             }
-            if (maxKb < 0) {
-                showNotification('Max File Size must be a positive number.', true);
-                return;
-            }
             
+            // Disable both buttons to prevent cross-tool processing while one is running
             resizeBtn.disabled = true;
-            statusMessage.textContent = 'Resizing and optimizing... Please wait.';
+            convertBtn.disabled = true; 
+            statusMessage.textContent = `Processing image to ${targetWidth}x${targetHeight}...`;
             resultArea.classList.add('hidden');
+            convertStatusMessage.textContent = '';
 
             try {
-                const result = await resizeImage(selectedFile, targetWidth, targetHeight, maxKb, bgColor);
+                const result = await resizeImage(resizeSelectedFile, targetWidth, targetHeight, maxKb, bgColor, selectedOutputFormat); 
                 
-                // Update UI with results
-                imagePreview.src = result.base64Data;
-                
-                let dimText = `${result.width}px x ${result.height}px`;
-                if (result.compressionQuality < 0.9) {
-                    dimText += ` (Quality: ${Math.round(result.compressionQuality * 100)}%)`;
-                }
-                resultDimensions.textContent = dimText;
-                
-                const finalSizeKb = getBase64SizeKb(result.base64Data);
-                resultSize.textContent = `${finalSizeKb} KB`;
-
-                // Set download link attributes
-                downloadLink.href = result.base64Data;
-                const extension = result.mimeType.split('/')[1];
-                downloadLink.download = `resized_${result.width}x${result.height}_${finalSizeKb}kb_${selectedFile.name.replace(/\.[^/.]+$/, "")}.${extension}`;
+                updateResult(
+                    result.base64Data, 
+                    result.width, 
+                    result.height, 
+                    result.mimeType, 
+                    result.fileName, 
+                    result.compressionQuality
+                );
                 
                 // Show warnings if necessary
                 if (maxKb > 0 && result.finalSizeKb > maxKb) {
-                    statusMessage.textContent = `Warning: Could only optimize down to ${finalSizeKb} KB (Target: ${maxKb} KB).`;
+                    statusMessage.textContent = `Success with Warning: Final size ${result.finalSizeKb.toLocaleString()} KB (Target: ${maxKb} KB).`;
                     showNotification('Resize successful, but max KB limit could not be strictly met.', true);
                 } else {
-                    statusMessage.textContent = 'Resize successful!';
+                    statusMessage.textContent = 'Resize and Optimization successful!';
                     showNotification('Image resized and ready to download!');
                 }
-                
-                // Show result area
-                resultArea.classList.remove('hidden');
 
             } catch (error) {
-                statusMessage.textContent = '';
+                statusMessage.textContent = `Resize failed: ${error.message}`;
                 console.error("Resize Error:", error);
                 showNotification(`Resize failed: ${error.message}`, true);
             } finally {
-                resizeBtn.disabled = false;
+                // IMPORTANT: Re-enable buttons
+                checkEnableButtons();
             }
         }
+        
+        async function handleConvert() {
+             if (!convertSelectedFile) { 
+                showNotification('Please select an image in the Converter section first.', true);
+                return;
+            }
+            
+            const targetMimeType = targetFormatInput.value;
+            const qualityValue = parseInt(conversionQualityInput.value, 10);
+            
+            if (isNaN(qualityValue) || qualityValue < 1 || qualityValue > 100) {
+                showNotification('Please enter a valid quality value between 1 and 100.', true);
+                return;
+            }
+            
+            // Disable buttons during conversion
+            resizeBtn.disabled = true;
+            convertBtn.disabled = true;
+            convertStatusMessage.textContent = `Converting format to ${targetMimeType.split('/')[1].toUpperCase()}...`;
+            resultArea.classList.add('hidden');
+            statusMessage.textContent = '';
+
+            try {
+                const result = await convertImage(convertSelectedFile, targetMimeType, qualityValue);
+                
+                updateResult(
+                    result.base64Data, 
+                    result.width, 
+                    result.height, 
+                    result.mimeType, 
+                    result.fileName, 
+                    result.compressionQuality
+                );
+                
+                convertStatusMessage.textContent = 'Format conversion successful!';
+                showNotification('Format converted and ready to download!');
+
+            } catch (error) {
+                convertStatusMessage.textContent = `Conversion failed: ${error.message}`;
+                console.error("Convert Error:", error);
+                showNotification(`Conversion failed: ${error.message}`, true);
+            } finally {
+                // IMPORTANT: Re-enable buttons
+                checkEnableButtons();
+            }
+        }
+
 
         // --- DRAG AND DROP HELPERS ---
         function preventDefaults (e) {
             e.preventDefault();
             e.stopPropagation();
         }
-
-        function handleDrop(e) {
-            e.preventDefault();
-            const dt = e.dataTransfer;
-            if (dt.files.length > 0) { handleFileSelection(dt.files[0]); }
-        }
-
+        
         // --- INITIALIZATION ---
+        
         function initApp() {
-            // Setup File Input Listener
+            // --- File Input Listeners ---
             fileInput.onchange = (e) => { 
                 const file = e.target.files[0]; 
-                handleFileSelection(file); 
+                handleFileSelection(file, false); // Resizer
+            };
+            convertFileInput.onchange = (e) => { 
+                const file = e.target.files[0]; 
+                handleFileSelection(file, true); // Converter
             };
             
-            // Setup Resize Button Listener
+            // --- Action Button Listeners ---
             resizeBtn.onclick = handleResize;
+            convertBtn.onclick = handleConvert;
 
-            // Setup Drop Zone Listeners
+            // --- Resizer Drop Zone Listeners ---
             ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
                 dropZone.addEventListener(eventName, preventDefaults, false);
             });
-            dropZone.addEventListener('drop', handleDrop, false);
+            dropZone.addEventListener('drop', (e) => {
+                preventDefaults(e);
+                const dt = e.dataTransfer;
+                if (dt.files.length > 0) { handleFileSelection(dt.files[0], false); }
+            }, false);
             dropZone.onclick = () => fileInput.click();
             
-            // Enable resize button if inputs are changed and a file is selected
-            const checkEnableResize = () => {
-                const width = parseInt(widthInput.value, 10);
-                const height = parseInt(heightInput.value, 10);
-                const maxKb = parseInt(maxKbInput.value, 10) || 0;
-                
-                resizeBtn.disabled = !(selectedFile && width > 0 && height > 0 && maxKb >= 0);
-            };
-
-            widthInput.addEventListener('input', checkEnableResize);
-            heightInput.addEventListener('input', checkEnableResize);
-            maxKbInput.addEventListener('input', checkEnableResize);
-            bgColorInput.addEventListener('change', checkEnableResize);
+            // --- Converter Drop Zone Listeners ---
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                convertDropZone.addEventListener(eventName, preventDefaults, false);
+            });
+            convertDropZone.addEventListener('drop', (e) => {
+                preventDefaults(e);
+                const dt = e.dataTransfer;
+                if (dt.files.length > 0) { handleFileSelection(dt.files[0], true); }
+            }, false);
+            convertDropZone.onclick = () => convertFileInput.click();
+            
+            
+            // --- Input Change Listeners (to check button status) ---
+            widthInput.addEventListener('input', checkEnableButtons);
+            heightInput.addEventListener('input', checkEnableButtons);
+            maxKbInput.addEventListener('input', checkEnableButtons);
+            bgColorInput.addEventListener('change', checkEnableButtons);
+            outputFormatInput.addEventListener('change', checkEnableButtons); 
+            targetFormatInput.addEventListener('change', checkEnableButtons);
+            conversionQualityInput.addEventListener('input', checkEnableButtons);
+            
+            // Set initial state
+            checkEnableButtons();
         }
 
         window.onload = initApp;
