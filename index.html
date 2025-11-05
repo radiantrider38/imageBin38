@@ -263,12 +263,15 @@
             transition: all 0.3s ease;
         }
         
-        /* Responsive optimizations */
-        @media (max-width: 768px) {
+        /* Responsive optimizations (Original rules retained/integrated) */
+        @media (max-width: 1024px) {
+            /* Hide distracting shapes on smaller screens */
             .floating-shape {
                 display: none;
             }
-            
+        }
+
+        @media (max-width: 768px) {
             .container-card:hover {
                 transform: none;
             }
@@ -281,6 +284,7 @@
         }
     </style>
 </head>
+<!-- Applied p-4 for general padding and used flex/justify-center for centering -->
 <body class="min-h-screen p-4 md:p-8 flex items-start justify-center">
 
     <!-- Floating background shapes -->
@@ -288,7 +292,7 @@
     <div class="floating-shape shape-2"></div>
     <div class="floating-shape shape-3"></div>
 
-    <div id="appContainer" class="w-full max-w-6xl container-card rounded-xl p-6 md:p-8 mt-10">
+    <div id="appContainer" class="w-full max-w-6xl container-card rounded-xl p-6 md:p-8 mt-4 sm:mt-8 lg:mt-10">
         <h1 class="text-3xl md:text-4xl font-black text-center mb-6 text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-violet-600">
             Image Optimizer: Resize and Convert
         </h1>
@@ -299,11 +303,11 @@
         <!-- Status Message Area -->
         <div id="statusMessage" class="hidden p-3 rounded-lg text-sm text-center mb-6 backdrop-blur-md"></div>
 
-        <!-- Main Content Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Main Content Grid: Changed lg:grid-cols-3 to md:grid-cols-3 for better tablet support -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
             
             <!-- Column 1: File Uploader & Preview -->
-            <div class="lg:col-span-1">
+            <div class="md:col-span-1">
                 <h2 class="text-xl font-semibold mb-4 pb-2 section-header">1. Upload Image</h2>
                 
                 <div id="dropZone" class="drop-zone p-8 text-center rounded-lg cursor-pointer hover:drop-zone-active mb-4">
@@ -321,7 +325,7 @@
             </div>
 
             <!-- Column 2: Resize Options (with Conversion Included) -->
-            <div class="lg:col-span-1">
+            <div class="md:col-span-1">
                 <h2 class="text-xl font-semibold mb-4 pb-2 section-header">2. Resize</h2>
                 <p class="text-gray-400 text-sm mb-4">Set new dimensions. Conversion settings from Section 3 will also apply.</p>
 
@@ -347,7 +351,7 @@
             </div>
 
             <!-- Column 3: Conversion Options (Convert Only) -->
-            <div class="lg:col-span-1">
+            <div class="md:col-span-1">
                 <h2 class="text-xl font-semibold mb-4 pb-2 section-header">3. Convert Only</h2>
                 <p class="text-gray-400 text-sm mb-4">Change format or quality without changing size.</p>
 
