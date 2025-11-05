@@ -10,38 +10,130 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
     
     <style>
+        /* --- Solar Flare Theme: Deep Charcoal & High-Energy Orange --- */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap');
+        
+        /* Define Theme Colors */
+        :root {
+            --dark-bg: #1A1A1A;      /* Deep Charcoal */
+            --dark-card: #282828;    /* Slightly lighter card */
+            --accent-orange: #FF9900;/* Primary Action Orange */
+            --accent-gold: #FFD700;  /* Secondary/Glow Gold */
+            --text-color: #F0F0F0;   /* Light Text */
+        }
+        
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #0d1117; /* Very Dark Background */
-            color: #f3f4f6;
+            background-color: var(--dark-bg); 
+            color: var(--text-color);
         }
+
+        /* Card and Shadows */
         .container-card {
-            background-color: #161b22; /* Card background */
-            box-shadow: 0 0 50px rgba(0, 0, 0, 0.6);
-            border: 1px solid #30363d;
+            background-color: var(--dark-card);
+            border: 1px solid rgba(255, 153, 0, 0.1);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
         }
+        
+        /* Title Styling */
+        .solar-title {
+            color: var(--accent-orange);
+            text-shadow: 0 0 5px rgba(255, 215, 0, 0.5), 0 0 15px rgba(255, 153, 0, 0.5);
+            transition: color 0.3s;
+        }
+
+        /* Buttons & Hover Effects */
         .btn-action {
-            transition: all 0.2s;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            font-weight: 700;
+            border-radius: 10px; 
+            letter-spacing: 0.5px;
         }
+        
         .btn-primary {
-            background-color: #238636; /* GitHub Green */
+            background: var(--accent-orange);
+            color: #1A1A1A; /* Dark text on bright button */
+            border: 2px solid var(--accent-gold);
+            box-shadow: 0 5px 20px rgba(255, 153, 0, 0.4);
         }
+        
         .btn-primary:hover {
-            background-color: #2ea043;
+            background: var(--accent-gold);
+            box-shadow: 0 0 25px var(--accent-gold); 
+            transform: translateY(-3px) scale(1.02);
         }
+        
+        .btn-primary:disabled {
+            background: #444;
+            border-color: #555;
+            color: #888;
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+            animation: none !important;
+        }
+
+        /* Input Field Styling */
         .input-field {
-            background-color: #0d1117;
-            border: 1px solid #30363d;
-            color: #f3f4f6;
-            padding: 10px;
+            background-color: #333;
+            border: 1px solid #555;
+            color: var(--text-color);
+            padding: 12px;
             border-radius: 8px;
-            transition: border-color 0.2s;
+            transition: border-color 0.3s, box-shadow 0.3s;
         }
         .input-field:focus {
-            border-color: #238636;
+            border-color: var(--accent-orange);
+            box-shadow: 0 0 10px rgba(255, 153, 0, 0.6);
             outline: none;
+        }
+
+        /* Drop Zone Neon Border & Hover */
+        #drop-zone {
+            border-color: #555;
+            border-radius: 12px;
+            transition: background-color 0.3s, border-color 0.3s, box-shadow 0.3s;
+        }
+        #drop-zone:hover {
+            border-color: var(--accent-orange);
+            background-color: #333;
+            box-shadow: 0 0 15px rgba(255, 153, 0, 0.4);
+        }
+        
+        /* Eye-Catching Animation: Subtle Breathing Effect on Active Button */
+        @keyframes breathe-glow {
+            0%, 100% {
+                box-shadow: 0 0 10px rgba(255, 153, 0, 0.6), 0 0 15px rgba(255, 215, 0, 0.1);
+            }
+            50% {
+                box-shadow: 0 0 15px rgba(255, 153, 0, 0.8), 0 0 25px rgba(255, 215, 0, 0.2);
+            }
+        }
+        .btn-primary:not(:disabled) {
+            animation: breathe-glow 4s infinite alternate ease-in-out;
+        }
+        
+        /* Result/Download Button Styling */
+        #download-link {
+            background-color: #4CAF50; /* A contrasting color for download */
+            color: #1A1A1A;
+            font-weight: 700;
+            transition: background-color 0.3s, box-shadow 0.3s;
+        }
+        #download-link:hover {
+            background-color: #45a049; 
+            box-shadow: 0 0 15px #4CAF50;
+        }
+        
+        /* Icon Colors */
+        #drop-zone svg {
+            color: var(--accent-orange);
+        }
+        
+        /* Status message color */
+        #status-message {
+            color: var(--accent-gold);
         }
     </style>
 </head>
@@ -51,76 +143,87 @@
     <!-- Main Resizer Container -->
     <div id="app-container" class="w-full max-w-4xl container-card rounded-xl p-6 md:p-10 mt-10 mx-auto">
         <div class="text-center mb-10 w-full">
-            <h1 class="text-4xl font-extrabold text-green-400 mb-2">Custom Image Resizer</h1>
-            <p class="text-gray-400">Upload an image, define new dimensions, and optionally set a file size limit.</p>
+            <!-- Updated title class for neon glow -->
+            <h1 class="text-4xl font-extrabold mb-2 solar-title">Advanced Image Transformer</h1>
+            <p class="text-gray-400">Upload, redefine dimensions, manage file size, and control background appearance.</p>
         </div>
 
         <!-- UPLOAD/INPUT SECTION -->
-        <div class="mb-10 p-6 bg-gray-900 rounded-xl border border-gray-700 w-full">
+        <div class="mb-10 p-6 bg-gray-900/30 rounded-xl border border-gray-700/50 w-full">
             
             <!-- Hidden File Input -->
             <input type="file" id="file-input" accept="image/*" class="hidden">
             
             <!-- Drop Zone / File Selector -->
-            <div id="drop-zone" class="p-8 text-center border-2 border-dashed border-green-500 rounded-xl cursor-pointer hover:bg-gray-800 transition duration-300 mb-6">
-                <svg class="mx-auto h-12 w-12 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v8"></path></svg>
-                <p class="mt-2 text-sm text-gray-300"><span class="font-semibold text-green-400" id="file-name-display">Click to select image</span> or drag and drop</p>
+            <div id="drop-zone" class="p-8 text-center border-2 border-dashed rounded-xl cursor-pointer mb-6">
+                <svg class="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v8"></path></svg>
+                <p class="mt-2 text-sm text-gray-300"><span class="font-semibold text-white" id="file-name-display">Click to select image</span> or drag and drop</p>
                 <p id="original-size" class="text-xs text-gray-500 mt-1 h-4"></p>
             </div>
 
             <!-- Dimension Inputs -->
-            <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mb-6">
-                <div class="flex-1">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                <div>
                     <label for="resize-width" class="block text-sm font-medium text-gray-400 mb-1">Target Width (px)</label>
                     <input type="number" id="resize-width" min="1" placeholder="e.g., 300" class="input-field w-full">
                 </div>
-                <div class="flex-1">
+                <div>
                     <label for="resize-height" class="block text-sm font-medium text-gray-400 mb-1">Target Height (px)</label>
                     <input type="number" id="resize-height" min="1" placeholder="e.g., 200" class="input-field w-full">
                 </div>
             </div>
             
-            <!-- NEW: Max Memory Input -->
+            <!-- Background Color Input -->
+            <div class="mb-4">
+                <label for="bg-color" class="block text-sm font-medium text-gray-400 mb-1">Background Fill Color</label>
+                <select id="bg-color" class="input-field w-full">
+                    <option value="transparent">Transparent (Recommended for PNG)</option>
+                    <option value="white">White (#FFFFFF)</option>
+                    <option value="black">Black (#000000)</option>
+                </select>
+            </div>
+            
+            <!-- Max Memory Input -->
             <div class="mb-6">
                 <label for="max-memory-kb" class="block text-sm font-medium text-gray-400 mb-1">Max File Size (KB) - Optional</label>
                 <input type="number" id="max-memory-kb" min="1" placeholder="e.g., 500 (Leave blank for no limit)" class="input-field w-full">
-                <p class="text-xs text-gray-500 mt-1">Note: Setting a limit will force JPEG output to allow compression.</p>
+                <p class="text-xs text-gray-500 mt-1">Note: Limiting file size forces **JPEG** output and fills transparent areas with **White**.</p>
             </div>
 
             <!-- Action Button -->
-            <button id="resize-btn" class="btn-action btn-primary w-full py-3 text-white font-semibold rounded-lg disabled:opacity-50" disabled>
-                <i class="fas fa-magic mr-2"></i> Resize Image
+            <button id="resize-btn" class="btn-action btn-primary w-full py-3 font-semibold disabled:opacity-50" disabled>
+                <i class="fas fa-meteor mr-2"></i> Initiate Transformation
             </button>
-            <p id="status-message" class="text-center mt-3 text-sm text-yellow-400 h-4"></p>
+            <p id="status-message" class="text-center mt-3 text-sm h-4"></p>
         </div>
 
         <!-- RESULT SECTION -->
         <div id="result-area" class="mt-12 w-full hidden">
-            <h2 class="text-2xl font-bold text-gray-200 mb-4 border-b border-green-500 pb-2">Resized Image Result</h2>
+            <h2 class="text-2xl font-bold text-gray-200 mb-4 border-b border-accent-orange pb-2">Resized Image Result</h2>
             
-            <div class="flex flex-col md:flex-row bg-gray-800 rounded-xl overflow-hidden border border-gray-700">
+            <div class="flex flex-col md:flex-row bg-gray-800/30 rounded-xl overflow-hidden border border-gray-700/50">
                 
                 <!-- Preview Area -->
-                <div class="md:w-1/2 p-4 flex items-center justify-center bg-gray-900">
+                <div class="md:w-1/2 p-4 flex items-center justify-center bg-gray-900/50">
                     <img id="image-preview" src="" alt="Resized Image Preview" class="max-w-full max-h-[40vh] object-contain rounded-md shadow-lg border border-gray-700 transition duration-300">
                 </div>
 
                 <!-- Info and Download -->
                 <div class="md:w-1/2 p-6 flex flex-col justify-center space-y-4">
-                    <h3 class="text-xl font-bold text-green-400">Ready for Download!</h3>
+                    <h3 class="text-xl font-bold text-accent-gold">Transformation Complete!</h3>
                     
                     <div class="space-y-2">
                         <p class="text-gray-400 font-medium">New Dimensions:</p>
-                        <p id="result-dimensions" class="text-white text-lg font-mono px-3 py-1 bg-gray-700 rounded-lg inline-block"></p>
+                        <p id="result-dimensions" class="text-white text-lg font-mono px-3 py-1 bg-gray-700/50 rounded-lg inline-block"></p>
                     </div>
 
                     <div class="space-y-2">
                         <p class="text-gray-400 font-medium">Final File Size:</p>
-                        <p id="result-size" class="text-white text-lg font-mono px-3 py-1 bg-gray-700 rounded-lg inline-block"></p>
+                        <p id="result-size" class="text-white text-lg font-mono px-3 py-1 bg-gray-700/50 rounded-lg inline-block"></p>
                     </div>
 
                     <a id="download-link" download="resized_image.png" 
-                       class="btn-action bg-yellow-600 hover:bg-yellow-500 text-gray-900 font-bold py-3 px-4 rounded-lg text-center cursor-pointer mt-4 shadow-md">
+                       class="btn-action bg-green-600 hover:bg-green-500 text-gray-900 font-bold py-3 px-4 rounded-lg text-center cursor-pointer mt-4 shadow-md">
                         <i class="fas fa-download mr-2"></i> Download Image
                     </a>
                 </div>
@@ -142,7 +245,8 @@
         const originalSizeDisplay = document.getElementById('original-size');
         const widthInput = document.getElementById('resize-width');
         const heightInput = document.getElementById('resize-height');
-        const maxKbInput = document.getElementById('max-memory-kb'); // NEW
+        const maxKbInput = document.getElementById('max-memory-kb'); 
+        const bgColorInput = document.getElementById('bg-color'); 
         const resizeBtn = document.getElementById('resize-btn');
         const statusMessage = document.getElementById('status-message');
         const resultArea = document.getElementById('result-area');
@@ -170,22 +274,20 @@
 
         /** Converts base64 to estimated size (KB) */
         function getBase64SizeKb(base64Data) {
-            // Base64 string length approximation for bytes (L * 0.75) / 1024 for KB
             const base64Content = base64Data.split(',')[1] || '';
             return Math.ceil((base64Content.length * 0.75) / 1024).toLocaleString();
         }
 
-        /** Core image resizing and compression function using HTML Canvas. 
-         * Includes iterative compression based on maxKb target.
-         */
-        function resizeImage(file, targetWidth, targetHeight, maxKb) {
+        /** Core image resizing and compression function using HTML Canvas. */
+        function resizeImage(file, targetWidth, targetHeight, maxKb, bgColor) { 
             return new Promise((resolve, reject) => {
                 if (targetWidth <= 0 || targetHeight <= 0) {
                     return reject(new Error("Target dimensions must be positive integers."));
                 }
                 
-                // If a maxKb limit is set, we must output JPEG as PNG does not support quality compression effectively.
-                const outputMimeType = (maxKb > 0) ? 'image/jpeg' : (file.type === 'image/jpeg' ? 'image/jpeg' : 'image/png');
+                // Determine output MIME type: forces JPEG if compression is needed or a solid color fill is required
+                const shouldForceJpeg = maxKb > 0 || bgColor !== 'transparent';
+                const outputMimeType = shouldForceJpeg ? 'image/jpeg' : (file.type === 'image/jpeg' ? 'image/jpeg' : 'image/png');
 
                 const reader = new FileReader();
                 reader.onload = (e) => {
@@ -196,6 +298,18 @@
                         canvas.height = targetHeight;
                         const ctx = canvas.getContext('2d');
                         
+                        // Background Color Fill Logic
+                        let actualBgColor = bgColor;
+                        if (bgColor === 'transparent' && outputMimeType === 'image/jpeg') {
+                            // JPEGs cannot be transparent, default to white if transparent was selected
+                            actualBgColor = 'white';
+                        }
+
+                        if (actualBgColor !== 'transparent') {
+                            ctx.fillStyle = actualBgColor === 'white' ? '#FFFFFF' : '#000000';
+                            ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        }
+
                         // Draw the image onto the canvas, fitting it exactly to the target dimensions
                         ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
 
@@ -210,24 +324,15 @@
                             const maxKbNum = parseFloat(maxKb);
                             
                             while (currentSizeKbNum > maxKbNum && finalQuality > 0.1) {
-                                finalQuality -= 0.05; // Drop quality by 5%
+                                finalQuality = Math.max(0.1, finalQuality - 0.05); // Drop quality by 5%, minimum 0.1
                                 
                                 // Recalculate size with new quality
                                 resizedBase64 = canvas.toDataURL(outputMimeType, finalQuality);
                                 currentSizeKbNum = parseFloat(getBase64SizeKb(resizedBase64).replace(/,/g, ''));
                                 
-                                // Prevent infinite loop safety
-                                if (finalQuality < 0.1) {
-                                    finalQuality = 0.1;
-                                    resizedBase64 = canvas.toDataURL(outputMimeType, finalQuality);
-                                    currentSizeKbNum = parseFloat(getBase64SizeKb(resizedBase64).replace(/,/g, ''));
+                                if (finalQuality === 0.1 && currentSizeKbNum > maxKbNum) {
                                     break;
                                 }
-                            }
-                            
-                            if (currentSizeKbNum > maxKbNum) {
-                                // Status message will handle the warning
-                                console.warn(`Image could not be compressed below ${maxKb}KB even at minimum quality (10%).`);
                             }
                         }
 
@@ -308,8 +413,8 @@
             
             const targetWidth = parseInt(widthInput.value, 10);
             const targetHeight = parseInt(heightInput.value, 10);
-            // Read max KB input, default to 0 if blank or invalid
             const maxKb = parseInt(maxKbInput.value, 10) || 0; 
+            const bgColor = bgColorInput.value; 
 
             if (isNaN(targetWidth) || isNaN(targetHeight) || targetWidth <= 0 || targetHeight <= 0) {
                 showNotification('Please enter valid, positive width and height values.', true);
@@ -325,8 +430,7 @@
             resultArea.classList.add('hidden');
 
             try {
-                // Pass the new maxKb parameter
-                const result = await resizeImage(selectedFile, targetWidth, targetHeight, maxKb);
+                const result = await resizeImage(selectedFile, targetWidth, targetHeight, maxKb, bgColor);
                 
                 // Update UI with results
                 imagePreview.src = result.base64Data;
@@ -408,6 +512,7 @@
             widthInput.addEventListener('input', checkEnableResize);
             heightInput.addEventListener('input', checkEnableResize);
             maxKbInput.addEventListener('input', checkEnableResize);
+            bgColorInput.addEventListener('change', checkEnableResize);
         }
 
         window.onload = initApp;
