@@ -52,7 +52,7 @@
     <div id="app-container" class="w-full max-w-4xl container-card rounded-xl p-6 md:p-10 mt-10 mx-auto">
         <div class="text-center mb-10 w-full">
             <h1 class="text-4xl font-extrabold text-green-400 mb-2">Custom Image Resizer</h1>
-            <p class="text-gray-400">Upload an image, define new dimensions, and download the resized version instantly.</p>
+            <p class="text-gray-400">Upload an image, define new dimensions, and optionally set a file size limit.</p>
         </div>
 
         <!-- UPLOAD/INPUT SECTION -->
@@ -78,6 +78,13 @@
                     <label for="resize-height" class="block text-sm font-medium text-gray-400 mb-1">Target Height (px)</label>
                     <input type="number" id="resize-height" min="1" placeholder="e.g., 200" class="input-field w-full">
                 </div>
+            </div>
+            
+            <!-- NEW: Max Memory Input -->
+            <div class="mb-6">
+                <label for="max-memory-kb" class="block text-sm font-medium text-gray-400 mb-1">Max File Size (KB) - Optional</label>
+                <input type="number" id="max-memory-kb" min="1" placeholder="e.g., 500 (Leave blank for no limit)" class="input-field w-full">
+                <p class="text-xs text-gray-500 mt-1">Note: Setting a limit will force JPEG output to allow compression.</p>
             </div>
 
             <!-- Action Button -->
@@ -108,7 +115,7 @@
                     </div>
 
                     <div class="space-y-2">
-                        <p class="text-gray-400 font-medium">Estimated File Size:</p>
+                        <p class="text-gray-400 font-medium">Final File Size:</p>
                         <p id="result-size" class="text-white text-lg font-mono px-3 py-1 bg-gray-700 rounded-lg inline-block"></p>
                     </div>
 
@@ -135,6 +142,7 @@
         const originalSizeDisplay = document.getElementById('original-size');
         const widthInput = document.getElementById('resize-width');
         const heightInput = document.getElementById('resize-height');
+        const maxKbInput = document.getElementById('max-memory-kb'); // NEW
         const resizeBtn = document.getElementById('resize-btn');
         const statusMessage = document.getElementById('status-message');
         const resultArea = document.getElementById('result-area');
@@ -154,6 +162,7 @@
             container.appendChild(notification);
             
             setTimeout(() => {
+                notification.style.opacity = '0';
                 notification.style.transform = 'translateX(120%)';
                 notification.addEventListener('transitionend', () => notification.remove());
             }, 3000);
@@ -161,18 +170,22 @@
 
         /** Converts base64 to estimated size (KB) */
         function getBase64SizeKb(base64Data) {
-            const sizeMatch = base64Data.match(/^data:image\/\w+;base64,(.*)/);
-            const base64Content = sizeMatch ? sizeMatch[1] : '';
-            // Size estimation for base64
-            return Math.ceil((base64Content.length * 3) / 4 / 1024).toLocaleString();
+            // Base64 string length approximation for bytes (L * 0.75) / 1024 for KB
+            const base64Content = base64Data.split(',')[1] || '';
+            return Math.ceil((base64Content.length * 0.75) / 1024).toLocaleString();
         }
 
-        /** Core image resizing function using HTML Canvas. */
-        function resizeImage(file, targetWidth, targetHeight) {
+        /** Core image resizing and compression function using HTML Canvas. 
+         * Includes iterative compression based on maxKb target.
+         */
+        function resizeImage(file, targetWidth, targetHeight, maxKb) {
             return new Promise((resolve, reject) => {
                 if (targetWidth <= 0 || targetHeight <= 0) {
                     return reject(new Error("Target dimensions must be positive integers."));
                 }
+                
+                // If a maxKb limit is set, we must output JPEG as PNG does not support quality compression effectively.
+                const outputMimeType = (maxKb > 0) ? 'image/jpeg' : (file.type === 'image/jpeg' ? 'image/jpeg' : 'image/png');
 
                 const reader = new FileReader();
                 reader.onload = (e) => {
@@ -184,25 +197,54 @@
                         const ctx = canvas.getContext('2d');
                         
                         // Draw the image onto the canvas, fitting it exactly to the target dimensions
-                        // This might distort the aspect ratio.
                         ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
 
-                        // Output as PNG for quality, or use original mimeType if known
-                        const mimeType = file.type === 'image/jpeg' ? 'image/jpeg' : 'image/png';
+                        let quality = 0.9; // Start at near-perfect quality
+                        let resizedBase64 = canvas.toDataURL(outputMimeType, quality);
+                        
+                        let currentSizeKbNum = parseFloat(getBase64SizeKb(resizedBase64).replace(/,/g, ''));
+                        let finalQuality = quality;
 
-                        const resizedBase64 = canvas.toDataURL(mimeType, 0.9); 
+                        // Iteratively reduce quality if maxKb is set AND we are outputting JPEG (for compression)
+                        if (maxKb > 0 && outputMimeType === 'image/jpeg') {
+                            const maxKbNum = parseFloat(maxKb);
+                            
+                            while (currentSizeKbNum > maxKbNum && finalQuality > 0.1) {
+                                finalQuality -= 0.05; // Drop quality by 5%
+                                
+                                // Recalculate size with new quality
+                                resizedBase64 = canvas.toDataURL(outputMimeType, finalQuality);
+                                currentSizeKbNum = parseFloat(getBase64SizeKb(resizedBase64).replace(/,/g, ''));
+                                
+                                // Prevent infinite loop safety
+                                if (finalQuality < 0.1) {
+                                    finalQuality = 0.1;
+                                    resizedBase64 = canvas.toDataURL(outputMimeType, finalQuality);
+                                    currentSizeKbNum = parseFloat(getBase64SizeKb(resizedBase64).replace(/,/g, ''));
+                                    break;
+                                }
+                            }
+                            
+                            if (currentSizeKbNum > maxKbNum) {
+                                // Status message will handle the warning
+                                console.warn(`Image could not be compressed below ${maxKb}KB even at minimum quality (10%).`);
+                            }
+                        }
+
                         resolve({ 
                             base64Data: resizedBase64, 
                             width: targetWidth, 
                             height: targetHeight,
-                            mimeType: mimeType,
-                            fileName: file.name
+                            mimeType: outputMimeType,
+                            fileName: file.name,
+                            compressionQuality: finalQuality,
+                            finalSizeKb: currentSizeKbNum
                         });
                     };
-                    img.onerror = () => reject(new Error("Could not load image file for resizing."));
+                    img.onerror = () => reject(new Error("Could not decode image for resizing. File may be corrupted."));
                     img.src = e.target.result;
                 };
-                reader.onerror = () => reject(new Error("Could not read file."));
+                reader.onerror = () => reject(new Error("Could not read file data for resizing."));
                 reader.readAsDataURL(file);
             });
         }
@@ -221,7 +263,7 @@
 
         function handleFileSelection(file) {
             if (!file || !file.type.startsWith('image/')) { 
-                showNotification('Invalid file type. Please select an image.', true); 
+                showNotification('Invalid file type. Please select an valid image file (JPEG, PNG, GIF).', true); 
                 handleClear(); 
                 return; 
             }
@@ -241,7 +283,15 @@
                     heightInput.value = img.height;
                     resizeBtn.disabled = false;
                 };
+                img.onerror = () => {
+                    showNotification('Could not decode image data for dimensions. File may be corrupted or too large.', true);
+                    handleClear();
+                };
                 img.src = e.target.result;
+            };
+            reader.onerror = () => {
+                showNotification('Error reading selected file. Please try a smaller file.', true);
+                handleClear();
             };
             reader.readAsDataURL(file);
             
@@ -258,32 +308,54 @@
             
             const targetWidth = parseInt(widthInput.value, 10);
             const targetHeight = parseInt(heightInput.value, 10);
+            // Read max KB input, default to 0 if blank or invalid
+            const maxKb = parseInt(maxKbInput.value, 10) || 0; 
 
             if (isNaN(targetWidth) || isNaN(targetHeight) || targetWidth <= 0 || targetHeight <= 0) {
                 showNotification('Please enter valid, positive width and height values.', true);
                 return;
             }
+            if (maxKb < 0) {
+                showNotification('Max File Size must be a positive number.', true);
+                return;
+            }
             
             resizeBtn.disabled = true;
-            statusMessage.textContent = 'Resizing in progress... Please wait.';
+            statusMessage.textContent = 'Resizing and optimizing... Please wait.';
             resultArea.classList.add('hidden');
 
             try {
-                const result = await resizeImage(selectedFile, targetWidth, targetHeight);
+                // Pass the new maxKb parameter
+                const result = await resizeImage(selectedFile, targetWidth, targetHeight, maxKb);
                 
                 // Update UI with results
                 imagePreview.src = result.base64Data;
-                resultDimensions.textContent = `${result.width}px x ${result.height}px`;
-                resultSize.textContent = `${getBase64SizeKb(result.base64Data)} KB`;
                 
+                let dimText = `${result.width}px x ${result.height}px`;
+                if (result.compressionQuality < 0.9) {
+                    dimText += ` (Quality: ${Math.round(result.compressionQuality * 100)}%)`;
+                }
+                resultDimensions.textContent = dimText;
+                
+                const finalSizeKb = getBase64SizeKb(result.base64Data);
+                resultSize.textContent = `${finalSizeKb} KB`;
+
                 // Set download link attributes
                 downloadLink.href = result.base64Data;
-                downloadLink.download = `resized_${result.width}x${result.height}_${selectedFile.name.replace(/\.[^/.]+$/, "")}.${result.mimeType.split('/')[1]}`;
+                const extension = result.mimeType.split('/')[1];
+                downloadLink.download = `resized_${result.width}x${result.height}_${finalSizeKb}kb_${selectedFile.name.replace(/\.[^/.]+$/, "")}.${extension}`;
                 
-                // Show result area and success message
+                // Show warnings if necessary
+                if (maxKb > 0 && result.finalSizeKb > maxKb) {
+                    statusMessage.textContent = `Warning: Could only optimize down to ${finalSizeKb} KB (Target: ${maxKb} KB).`;
+                    showNotification('Resize successful, but max KB limit could not be strictly met.', true);
+                } else {
+                    statusMessage.textContent = 'Resize successful!';
+                    showNotification('Image resized and ready to download!');
+                }
+                
+                // Show result area
                 resultArea.classList.remove('hidden');
-                statusMessage.textContent = 'Resize successful!';
-                showNotification('Image resized and ready to download!');
 
             } catch (error) {
                 statusMessage.textContent = '';
@@ -328,11 +400,14 @@
             const checkEnableResize = () => {
                 const width = parseInt(widthInput.value, 10);
                 const height = parseInt(heightInput.value, 10);
-                resizeBtn.disabled = !(selectedFile && width > 0 && height > 0);
+                const maxKb = parseInt(maxKbInput.value, 10) || 0;
+                
+                resizeBtn.disabled = !(selectedFile && width > 0 && height > 0 && maxKb >= 0);
             };
 
             widthInput.addEventListener('input', checkEnableResize);
             heightInput.addEventListener('input', checkEnableResize);
+            maxKbInput.addEventListener('input', checkEnableResize);
         }
 
         window.onload = initApp;
